@@ -1,0 +1,38 @@
+# Dependencies
+node_modules/
+
+# Environment (keep .env.example)
+.env
+.env.local
+.env.*.local
+
+# Build / output (backend: dist; frontend: Vite → dist)
+**/dist/
+**/build/
+**/.vite/
+*.tsbuildinfo
+
+# Logs and runtime
+*.log
+logs/
+.server-pids
+
+# IDE / OS
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Prisma
+backend/prisma/*.db
+backend/prisma/*.db-journal
+
+# Test / coverage
+coverage/
+.nyc_output/
+*.lcov
+
+# Optional
+*.local

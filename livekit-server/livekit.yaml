@@ -1,0 +1,18 @@
+# LiveKit SFU config - self-hosted
+# Docs: https://docs.livekit.io/transport/self-hosting/deployment/
+port: 7880
+log_level: info
+
+# WebRTC
+rtc:
+  tcp_port: 7881
+  port_range_start: 50000
+  port_range_end: 50100
+  # false for local Docker; true when server has a public IP (VM, cloud)
+  use_external_ip: false
+
+# API keys - used for JWT auth. Backend must use the same key/secret.
+# Change these for production.
+keys:
+  devkey: secret
+  # Add more: your-api-key: your-api-secret

@@ -1,0 +1,68 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  TEACHER
+  STUDENT
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  role      Role
+  name      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  classesAsTeacher Class[]       @relation("TeacherClasses")
+  invites          ClassInvite[]
+}
+
+model Class {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  teacherId   String
+  teacher     User     @relation("TeacherClasses", fields: [teacherId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  roomName    String   @unique
+  redirectUrl String?  // optional URL to redirect when meeting ends or user disconnects
+
+  invites    ClassInvite[]
+  attendance Attendance[]
+}
+
+model ClassInvite {
+  id        String   @id @default(cuid())
+  classId   String
+  class     Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
+  email     String
+  invitedBy String
+  inviter   User     @relation(fields: [invitedBy], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([classId, email])
+  @@index([classId])
+  @@index([email])
+}
+
+model Attendance {
+  id        String    @id @default(cuid())
+  classId   String
+  class     Class     @relation(fields: [classId], references: [id], onDelete: Cascade)
+  email     String
+  joinTime  DateTime  @default(now())
+  leaveTime DateTime?
+  duration  Int?      // seconds
+
+  @@index([classId])
+  @@index([email])
+}

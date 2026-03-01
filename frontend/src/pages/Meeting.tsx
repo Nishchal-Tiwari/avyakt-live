@@ -99,6 +99,12 @@ function MeetingBar({
       >
         Camera
       </TrackToggle>
+      <TrackToggle
+        source={Track.Source.ScreenShare}
+        className="lk-button px-4 py-2 rounded-lg bg-stone-700 text-white text-sm font-medium hover:bg-stone-600 disabled:opacity-50 [&.lk-enabled]:bg-amber-600 [&.lk-enabled]:hover:bg-amber-700"
+      >
+        Share screen
+      </TrackToggle>
       <DisconnectButton
         className="px-4 py-2 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700"
       >

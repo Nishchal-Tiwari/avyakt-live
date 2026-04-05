@@ -7,11 +7,58 @@ import {
   useLocalParticipant,
   TrackToggle,
   DisconnectButton,
+  useRoomContext,
 } from "@livekit/components-react";
 import { Track } from "livekit-client";
 import { useAuth } from "@/contexts/AuthContext";
 import { api, type JoinMeetingResponse } from "@/lib/api";
 import "@livekit/components-styles";
+
+/* ── Native <select> device picker — immune to CSS z-index/overflow issues ── */
+function NativeDeviceSelect({ kind }: { kind: MediaDeviceKind }) {
+  const room = useRoomContext();
+  const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
+  const [activeId, setActiveId] = useState("");
+
+  useEffect(() => {
+    async function load() {
+      const devs = await navigator.mediaDevices.enumerateDevices();
+      setDevices(devs.filter((d) => d.kind === kind));
+    }
+    load();
+    navigator.mediaDevices.addEventListener("devicechange", load);
+    return () => navigator.mediaDevices.removeEventListener("devicechange", load);
+  }, [kind]);
+
+  async function handleChange(e: React.ChangeEvent<HTMLSelectElement>) {
+    const deviceId = e.target.value;
+    setActiveId(deviceId);
+    try {
+      const trackSource = kind === "audioinput" ? Track.Source.Microphone : Track.Source.Camera;
+      await room.switchActiveDevice(kind, deviceId);
+    } catch (err) {
+      console.error("Failed to switch device:", err);
+    }
+  }
+
+  if (devices.length <= 1) return null; // no point showing picker with 0-1 devices
+
+  return (
+    <select
+      value={activeId}
+      onChange={handleChange}
+      className="py-2 px-2 rounded-r-lg bg-stone-600 text-white text-xs hover:bg-stone-500 border-l border-stone-500 cursor-pointer outline-none max-w-[120px]"
+      title={kind === "audioinput" ? "Choose Microphone" : "Choose Camera"}
+    >
+      {!activeId && <option value="">Select…</option>}
+      {devices.map((d) => (
+        <option key={d.deviceId} value={d.deviceId}>
+          {d.label || `Device ${d.deviceId.slice(0, 8)}`}
+        </option>
+      ))}
+    </select>
+  );
+}
 
 function MeetingBar({
   classId,
@@ -50,7 +97,7 @@ function MeetingBar({
   const others = participants.filter((p) => p.identity !== localParticipant?.identity);
 
   return (
-    <div className="absolute top-0 left-0 right-0 z-10 flex items-center justify-center gap-2 flex-wrap bg-stone-900/90 backdrop-blur px-4 py-3 border-b border-stone-700">
+    <div className="flex items-center justify-center gap-2 flex-wrap bg-stone-900/90 backdrop-blur px-4 py-3 border-b border-stone-700">
       {isTeacher && (
         <>
           <button
@@ -87,18 +134,29 @@ function MeetingBar({
           <span className="w-px h-6 bg-stone-600" aria-hidden />
         </>
       )}
-      <TrackToggle
-        source={Track.Source.Microphone}
-        className="lk-button px-4 py-2 rounded-lg bg-stone-700 text-white text-sm font-medium hover:bg-stone-600 disabled:opacity-50 [&.lk-enabled]:bg-emerald-600 [&.lk-enabled]:hover:bg-emerald-700"
-      >
-        Mic
-      </TrackToggle>
-      <TrackToggle
-        source={Track.Source.Camera}
-        className="lk-button px-4 py-2 rounded-lg bg-stone-700 text-white text-sm font-medium hover:bg-stone-600 disabled:opacity-50 [&.lk-enabled]:bg-emerald-600 [&.lk-enabled]:hover:bg-emerald-700"
-      >
-        Camera
-      </TrackToggle>
+
+      {/* Mic toggle + device selector */}
+      <div className="flex items-stretch">
+        <TrackToggle
+          source={Track.Source.Microphone}
+          className="lk-button px-4 py-2 rounded-l-lg rounded-r-none bg-stone-700 text-white text-sm font-medium hover:bg-stone-600 disabled:opacity-50 [&.lk-enabled]:bg-emerald-600 [&.lk-enabled]:hover:bg-emerald-700"
+        >
+          Mic
+        </TrackToggle>
+        <NativeDeviceSelect kind="audioinput" />
+      </div>
+
+      {/* Camera toggle + device selector */}
+      <div className="flex items-stretch">
+        <TrackToggle
+          source={Track.Source.Camera}
+          className="lk-button px-4 py-2 rounded-l-lg rounded-r-none bg-stone-700 text-white text-sm font-medium hover:bg-stone-600 disabled:opacity-50 [&.lk-enabled]:bg-emerald-600 [&.lk-enabled]:hover:bg-emerald-700"
+        >
+          Camera
+        </TrackToggle>
+        <NativeDeviceSelect kind="videoinput" />
+      </div>
+
       <TrackToggle
         source={Track.Source.ScreenShare}
         className="lk-button px-4 py-2 rounded-lg bg-stone-700 text-white text-sm font-medium hover:bg-stone-600 disabled:opacity-50 [&.lk-enabled]:bg-amber-600 [&.lk-enabled]:hover:bg-amber-700"
@@ -122,12 +180,12 @@ function MeetingInner({
   isTeacher: boolean;
 }) {
   return (
-    <>
+    <div className="flex flex-col h-full">
       <MeetingBar classId={classId} isTeacher={isTeacher} />
-      <div className="pt-14 h-full">
+      <div className="flex-1 min-h-0 overflow-hidden">
         <VideoConference />
       </div>
-    </>
+    </div>
   );
 }
 

@@ -2,6 +2,7 @@ import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   LiveKitRoom,
+  LayoutContextProvider,
   useParticipants,
   useLocalParticipant,
   TrackToggle,
@@ -12,8 +13,12 @@ import {
   RoomAudioRenderer,
   useIsSpeaking,
   isTrackReference,
+  useChat,
+  useLayoutContext,
+  usePinnedTracks,
 } from "@livekit/components-react";
 import type { TrackReferenceOrPlaceholder } from "@livekit/components-react";
+import { isTrackReferencePinned } from "@livekit/components-core";
 import { Track } from "livekit-client";
 import { useAuth } from "@/contexts/AuthContext";
 import { api, type JoinMeetingResponse } from "@/lib/api";
@@ -144,6 +149,12 @@ function ClockIcon() {
   );
 }
 
+/* Keeps LiveKit chat handlers registered so messages arrive even when the chat panel is closed. */
+function RoomChatBootstrap() {
+  useChat();
+  return null;
+}
+
 /* ═══════════════════════════════════════════════════════════
    Device Picker (native <select>)
    ═══════════════════════════════════════════════════════════ */
@@ -196,16 +207,52 @@ function NativeDeviceSelect({ kind }: { kind: MediaDeviceKind }) {
    Participant Tile
    ═══════════════════════════════════════════════════════════ */
 
-function ParticipantTile({ trackRef }: { trackRef: TrackReferenceOrPlaceholder }) {
+function ParticipantTile({
+  trackRef,
+  pinInteractive = true,
+  layout = "grid",
+}: {
+  trackRef: TrackReferenceOrPlaceholder;
+  pinInteractive?: boolean;
+  layout?: "grid" | "focus-main" | "strip";
+}) {
   const participant = trackRef.participant;
+  const layoutCtx = useLayoutContext();
   const isSpeaking = useIsSpeaking(participant);
   const isMicMuted = !participant.isMicrophoneEnabled;
   const name = participant.name || participant.identity;
   const isLocal = participant.isLocal;
   const hasVideo = isTrackReference(trackRef) && trackRef.publication?.track != null;
+  const isPinned = isTrackReferencePinned(trackRef, layoutCtx.pin.state);
+
+  function handleTileActivate() {
+    const dispatch = layoutCtx.pin.dispatch;
+    if (!pinInteractive || !dispatch) return;
+    if (isPinned) dispatch({ msg: "clear_pin" });
+    else dispatch({ msg: "set_pin", trackReference: trackRef });
+  }
+
+  const layoutClass =
+    layout === "focus-main" ? " meet-tile--focus-main" : layout === "strip" ? " meet-tile--strip" : "";
 
   return (
-    <div className={`meet-tile${isSpeaking ? " meet-tile--speaking" : ""}`}>
+    <div
+      className={`meet-tile${isSpeaking ? " meet-tile--speaking" : ""}${pinInteractive ? " meet-tile--clickable" : ""}${layoutClass}`}
+      role={pinInteractive ? "button" : undefined}
+      tabIndex={pinInteractive ? 0 : undefined}
+      title={pinInteractive ? (isPinned ? "Back to gallery" : "Focus this participant") : undefined}
+      onClick={pinInteractive ? handleTileActivate : undefined}
+      onKeyDown={
+        pinInteractive
+          ? (ev) => {
+              if (ev.key === "Enter" || ev.key === " ") {
+                ev.preventDefault();
+                handleTileActivate();
+              }
+            }
+          : undefined
+      }
+    >
       {hasVideo ? (
         <VideoTrack trackRef={trackRef} className="meet-tile__video" />
       ) : (
@@ -215,6 +262,13 @@ function ParticipantTile({ trackRef }: { trackRef: TrackReferenceOrPlaceholder }
           </div>
         </div>
       )}
+      {pinInteractive && isPinned && (
+        <span className="meet-tile__pin-badge" title="Focused">
+          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+            <path d="M16 9V4h1c.55 0 1-.45 1-1s-.45-1-1-1H7c-.55 0-1 .45-1 1s.45 1 1 1h1v5c0 1.66-1.34 3-3 3v2h5.97v7l1 1 1-1v-7H19v-2c-1.66 0-3-1.34-3-3z" />
+          </svg>
+        </span>
+      )}
       <div className="meet-tile__overlay">
         <div className="meet-tile__info">
           {isMicMuted && (
@@ -222,7 +276,10 @@ function ParticipantTile({ trackRef }: { trackRef: TrackReferenceOrPlaceholder }
               <MicOffIcon />
             </span>
           )}
-          <span className="meet-tile__name">{name}{isLocal ? " (You)" : ""}</span>
+          <span className="meet-tile__name">
+            {name}
+            {isLocal ? " (You)" : ""}
+          </span>
         </div>
       </div>
     </div>
@@ -255,6 +312,10 @@ function ScreenShareTile({ trackRef }: { trackRef: TrackReferenceOrPlaceholder }
 function VideoGrid() {
   const isMobile = useIsMobile();
   const [page, setPage] = useState(0);
+  const layoutCtx = useLayoutContext();
+  const pinnedTracks = usePinnedTracks();
+  const pinState = layoutCtx.pin.state;
+  const wasScreenShareRef = useRef(false);
 
   const cameraTracks = useTracks(
     [{ source: Track.Source.Camera, withPlaceholder: true }],
@@ -268,6 +329,13 @@ function VideoGrid() {
 
   const activeScreenShare = screenShareTracks.length > 0 ? screenShareTracks[0] : null;
   const isScreenShareMode = activeScreenShare != null;
+
+  useEffect(() => {
+    if (isScreenShareMode && !wasScreenShareRef.current) {
+      layoutCtx.pin.dispatch?.({ msg: "clear_pin" });
+    }
+    wasScreenShareRef.current = isScreenShareMode;
+  }, [isScreenShareMode, layoutCtx.pin.dispatch]);
 
   const layout = useMemo(() => {
     if (isScreenShareMode) {
@@ -287,6 +355,14 @@ function VideoGrid() {
     [cameraTracks, page, layout.max],
   );
 
+  const pinnedTrack = pinnedTracks[0];
+  const isFocusMode = Boolean(pinnedTrack) && !isScreenShareMode;
+
+  const stripTracks = useMemo(() => {
+    if (!pinnedTrack) return [];
+    return cameraTracks.filter((t) => !isTrackReferencePinned(t, pinState));
+  }, [cameraTracks, pinState, pinnedTrack]);
+
   if (isScreenShareMode) {
     return (
       <div className={`meet-screenshare${isMobile ? " meet-screenshare--mobile" : ""}`}>
@@ -295,9 +371,42 @@ function VideoGrid() {
         </div>
         <div className="meet-screenshare__sidebar">
           {cameraTracks.map((t) => (
-            <ParticipantTile key={t.participant.identity} trackRef={t} />
+            <ParticipantTile
+              key={`${t.participant.identity}-${t.source}`}
+              trackRef={t}
+              pinInteractive={false}
+              layout="strip"
+            />
           ))}
         </div>
+      </div>
+    );
+  }
+
+  if (isFocusMode && pinnedTrack) {
+    return (
+      <div className="meet-grid-container meet-focus">
+        <button
+          type="button"
+          className="meet-gallery-btn"
+          onClick={() => layoutCtx.pin.dispatch?.({ msg: "clear_pin" })}
+        >
+          Gallery view
+        </button>
+        <div className="meet-focus-main">
+          <ParticipantTile trackRef={pinnedTrack} layout="focus-main" />
+        </div>
+        {stripTracks.length > 0 && (
+          <div className="meet-focus-strip">
+            {stripTracks.map((t) => (
+              <ParticipantTile
+                key={`${t.participant.identity}-${t.source}`}
+                trackRef={t}
+                layout="strip"
+              />
+            ))}
+          </div>
+        )}
       </div>
     );
   }
@@ -312,7 +421,7 @@ function VideoGrid() {
         }}
       >
         {visibleTracks.map((t) => (
-          <ParticipantTile key={t.participant.identity} trackRef={t} />
+          <ParticipantTile key={`${t.participant.identity}-${t.source}`} trackRef={t} />
         ))}
       </div>
 
@@ -568,6 +677,7 @@ function MeetingInner({
   return (
     <div className="meet-root">
       <RoomAudioRenderer />
+      <RoomChatBootstrap />
 
       <div className="meet-body">
         {/* Main video area */}
@@ -729,12 +839,14 @@ export default function Meeting() {
         }}
         style={{ height: "100%" }}
       >
-        <MeetingInner
-          classId={classId!}
-          isTeacher={user!.role === "TEACHER"}
-          teacherName={tokenData.teacherName || "the Host"}
-          teacherEmail={tokenData.teacherEmail || ""}
-        />
+        <LayoutContextProvider>
+          <MeetingInner
+            classId={classId!}
+            isTeacher={user!.role === "TEACHER"}
+            teacherName={tokenData.teacherName || "the Host"}
+            teacherEmail={tokenData.teacherEmail || ""}
+          />
+        </LayoutContextProvider>
       </LiveKitRoom>
     </div>
   );

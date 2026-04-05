@@ -6,121 +6,668 @@ body {
   @apply bg-stone-50 text-stone-900 antialiased;
 }
 
-/* Override LiveKit component styles to prevent double-screen issue */
-.lk-video-conference {
-  height: 100% !important;
-  max-height: 100% !important;
+/* ═══════════════════════════════════════════════════════════
+   Meeting Layout
+   ═══════════════════════════════════════════════════════════ */
+
+.meet-root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: #202124;
+  color: #e8eaed;
+  overflow: hidden;
 }
 
-.lk-video-conference-inner {
-  height: 100% !important;
+.meet-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  overflow: hidden;
 }
 
-/* Hide the default LiveKit control bar since we have our own MeetingBar */
-.lk-video-conference .lk-control-bar {
-  display: none !important;
+.meet-content {
+  flex: 1;
+  min-width: 0;
+  position: relative;
+  transition: flex 0.25s ease;
 }
 
-/* ── MediaDeviceMenu dropdown styling ── */
-
-/* Ensure the menu wrapper doesn't clip the dropdown */
-.lk-button-group-menu {
-  overflow: visible !important;
+.meet-content--with-panel {
+  flex: 1 1 0%;
 }
 
-.lk-device-menu {
-  position: absolute !important;
-  top: 100% !important;   /* below the button instead of on top of it */
-  left: auto !important;
-  right: 0 !important;
-  z-index: 99999 !important;
-  background: #292524 !important; /* stone-800 */
-  border: 1px solid #57534e !important; /* stone-600 */
-  border-radius: 0.5rem !important;
-  padding: 0.375rem !important;
-  min-width: 14rem !important;
-  margin-top: 0.25rem !important;
-  box-shadow: 0 20px 48px rgba(0,0,0,0.5) !important;
+/* ═══════════════════════════════════════════════════════════
+   Video Grid
+   ═══════════════════════════════════════════════════════════ */
+
+.meet-grid-container {
+  height: 100%;
+  position: relative;
+  padding: 8px;
 }
 
-/* Device list items */
-.lk-device-menu .lk-device-list,
-.lk-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
+.meet-grid {
+  display: grid;
+  gap: 8px;
+  height: 100%;
+  width: 100%;
 }
 
-.lk-device-menu .lk-device-list li,
-.lk-list li {
+/* ═══════════════════════════════════════════════════════════
+   Participant Tile
+   ═══════════════════════════════════════════════════════════ */
+
+.meet-tile {
+  position: relative;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #3c4043;
+  outline: 3px solid transparent;
+  outline-offset: -3px;
+  transition: outline-color 0.2s ease;
+}
+
+.meet-tile--speaking {
+  outline-color: #8ab4f8;
+}
+
+.meet-tile--screen {
+  background: #000;
+}
+
+.meet-tile__video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.meet-tile__video--contain {
+  object-fit: contain;
+  background: #000;
+}
+
+.meet-tile__avatar {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.45rem 0.5rem;
-  border-radius: 0.375rem;
-  color: #e7e5e4 !important; /* stone-200 */
-  font-size: 0.8125rem;
+  justify-content: center;
+  height: 100%;
+  width: 100%;
+}
+
+.meet-tile__avatar-circle {
+  width: clamp(48px, 8vw, 96px);
+  height: clamp(48px, 8vw, 96px);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: clamp(18px, 3vw, 36px);
+  font-weight: 600;
+  color: white;
+  user-select: none;
+}
+
+.meet-tile__overlay {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 8px 12px;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.65) 0%, transparent 100%);
+  pointer-events: none;
+}
+
+.meet-tile__info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.meet-tile__mic-off {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #ea4335;
+  color: white;
+  flex-shrink: 0;
+}
+
+.meet-tile__name {
+  color: white;
+  font-size: 13px;
+  font-weight: 500;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Screen Share Layout
+   ═══════════════════════════════════════════════════════════ */
+
+.meet-screenshare {
+  display: flex;
+  height: 100%;
+  gap: 8px;
+  padding: 8px;
+}
+
+.meet-screenshare__main {
+  flex: 1;
+  min-width: 0;
+}
+
+.meet-screenshare__sidebar {
+  width: 220px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #5f6368 transparent;
+}
+
+.meet-screenshare--mobile {
+  flex-direction: column;
+}
+
+.meet-screenshare--mobile .meet-screenshare__sidebar {
+  width: 100%;
+  flex-direction: row;
+  height: 100px;
+  min-height: 100px;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.meet-screenshare--mobile .meet-screenshare__sidebar .meet-tile {
+  min-width: 140px;
+  flex-shrink: 0;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Pagination
+   ═══════════════════════════════════════════════════════════ */
+
+.meet-page-btn {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: rgba(32, 33, 36, 0.85);
+  color: #e8eaed;
+  border: 1px solid #5f6368;
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+  transition: background 0.15s, transform 0.15s;
+  backdrop-filter: blur(4px);
+}
+
+.meet-page-btn:hover {
+  background: rgba(60, 64, 67, 0.95);
+  transform: translateY(-50%) scale(1.08);
+}
+
+.meet-page-btn--prev {
+  left: 16px;
+}
+
+.meet-page-btn--next {
+  right: 16px;
+}
+
+.meet-page-indicator {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(32, 33, 36, 0.85);
+  color: #e8eaed;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 4px 14px;
+  border-radius: 16px;
+  z-index: 10;
+  border: 1px solid #5f6368;
+  backdrop-filter: blur(4px);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Bottom Control Bar
+   ═══════════════════════════════════════════════════════════ */
+
+.meet-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  background: #202124;
+  border-top: 1px solid #303134;
+  flex-shrink: 0;
+}
+
+.meet-controls__left,
+.meet-controls__right {
+  flex: 1;
+  min-width: 0;
+}
+
+.meet-controls__left {
+  display: flex;
+  align-items: center;
+}
+
+.meet-controls__right {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.meet-controls__info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #9aa0a6;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.meet-controls__center {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.meet-controls__btn-group {
+  display: flex;
+  align-items: stretch;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Control Buttons
+   ═══════════════════════════════════════════════════════════ */
+
+.meet-ctrl-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 14px;
+  height: 40px;
+  border-radius: 24px;
+  border: none;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  font-family: inherit;
+  color: #e8eaed;
+  background: #3c4043;
+  transition: background 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+
+.meet-ctrl-btn:hover {
+  background: #4a4d51;
+}
+
+.meet-ctrl-btn--active {
+  background: #8ab4f8;
+  color: #202124;
+}
+
+.meet-ctrl-btn--active:hover {
+  background: #aecbfa;
+}
+
+/* Track toggles: enabled = gray, disabled = red */
+.meet-ctrl-btn--toggle {
+  padding: 0;
+  width: 40px;
+  border-radius: 50%;
+}
+
+.meet-ctrl-btn--toggle[data-lk-enabled="true"] {
+  background: #3c4043;
+  color: #e8eaed;
+}
+
+.meet-ctrl-btn--toggle[data-lk-enabled="true"]:hover {
+  background: #4a4d51;
+}
+
+.meet-ctrl-btn--toggle[data-lk-enabled="false"] {
+  background: #ea4335;
+  color: white;
+}
+
+.meet-ctrl-btn--toggle[data-lk-enabled="false"]:hover {
+  background: #d33426;
+}
+
+/* Screen share: enabled = blue highlight */
+.meet-ctrl-btn--share[data-lk-enabled="true"] {
+  background: #8ab4f8;
+  color: #202124;
+}
+
+.meet-ctrl-btn--share[data-lk-enabled="true"]:hover {
+  background: #aecbfa;
+}
+
+/* When toggle is in a button group, flatten the right radius */
+.meet-controls__btn-group .meet-ctrl-btn--toggle {
+  border-radius: 50%;
+}
+
+.meet-controls__btn-group:has(.meet-device-select) .meet-ctrl-btn--toggle {
+  border-radius: 20px 0 0 20px;
+}
+
+/* Leave / End button */
+.meet-ctrl-btn--leave {
+  background: #ea4335;
+  color: white;
+  padding: 0 20px;
+}
+
+.meet-ctrl-btn--leave:hover {
+  background: #d33426;
+}
+
+.meet-ctrl-btn--leave:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* People button badge */
+.meet-ctrl-btn--people {
+  position: relative;
+}
+
+.meet-ctrl-btn__badge {
+  font-size: 11px;
+  font-weight: 600;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: 9px;
+  background: #5f6368;
+  color: #e8eaed;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Device Select (native)
+   ═══════════════════════════════════════════════════════════ */
+
+.meet-device-select {
+  height: 40px;
+  padding: 0 8px;
+  border-radius: 0 20px 20px 0;
+  background: #3c4043;
+  color: #e8eaed;
+  font-size: 11px;
+  font-family: inherit;
+  border: none;
+  border-left: 1px solid #5f6368;
+  cursor: pointer;
+  outline: none;
+  max-width: 36px;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%239aa0a6' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: center;
+  transition: background-color 0.15s;
+}
+
+.meet-device-select:hover {
+  background-color: #4a4d51;
+}
+
+/* When parent toggle is red (off), match the select */
+.meet-controls__btn-group:has(.meet-ctrl-btn--toggle[data-lk-enabled="false"]) .meet-device-select {
+  background: #d33426;
+  border-left-color: rgba(255, 255, 255, 0.2);
+}
+
+.meet-controls__btn-group:has(.meet-ctrl-btn--toggle[data-lk-enabled="false"]) .meet-device-select:hover {
+  background: #c22d1f;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Side Panel (Chat / People)
+   ═══════════════════════════════════════════════════════════ */
+
+.meet-side-panel {
+  width: 360px;
+  flex-shrink: 0;
+  border-left: 1px solid #303134;
+  display: flex;
+  flex-direction: column;
+  background: #202124;
+  overflow: hidden;
+}
+
+.meet-side-panel--mobile {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  z-index: 50;
+  border-left: none;
+  background: #202124;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Participants Panel
+   ═══════════════════════════════════════════════════════════ */
+
+.meet-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: #202124;
+}
+
+.meet-panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid #303134;
+  flex-shrink: 0;
+}
+
+.meet-panel__title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #e8eaed;
+}
+
+.meet-panel__close {
+  background: none;
+  border: none;
+  color: #9aa0a6;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 50%;
+  display: flex;
+  transition: color 0.15s, background 0.15s;
+}
+
+.meet-panel__close:hover {
+  color: #e8eaed;
+  background: #3c4043;
+}
+
+.meet-panel__body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.meet-panel__person {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
   transition: background 0.15s;
 }
 
-.lk-device-menu .lk-device-list li:hover,
-.lk-list li:hover {
-  background: #44403c !important; /* stone-700 */
+.meet-panel__person:hover {
+  background: #292a2d;
 }
 
-.lk-device-menu .lk-device-list li[data-lk-active="true"],
-.lk-device-menu .lk-device-list li.lk-active,
-.lk-list li[data-lk-active="true"],
-.lk-list li.lk-active {
-  background: #065f46 !important; /* emerald-800 */
-  color: #d1fae5 !important; /* emerald-100 */
+.meet-panel__avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 600;
+  color: white;
+  flex-shrink: 0;
 }
 
-/* Style the MediaDeviceMenu trigger button */
-button.lk-button.lk-device-menu-btn {
-  padding: 0.5rem !important;
-  border-radius: 0 0.5rem 0.5rem 0 !important;
-  background: #57534e !important;
-  color: white !important;
-  font-size: 0.75rem !important;
-  border-left: 1px solid #78716c !important;
+.meet-panel__person-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
 }
 
-button.lk-button.lk-device-menu-btn:hover {
-  background: #78716c !important;
+.meet-panel__person-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: #e8eaed;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-/* ── Custom Chat Styling (Google Meet Inspired) ── */
+.meet-panel__you {
+  color: #9aa0a6;
+  font-weight: 400;
+}
+
+.meet-panel__person-status {
+  font-size: 12px;
+  color: #9aa0a6;
+}
+
+.meet-panel__kick {
+  background: none;
+  border: 1px solid #5f6368;
+  color: #ea4335;
+  font-size: 12px;
+  font-family: inherit;
+  font-weight: 500;
+  padding: 4px 12px;
+  border-radius: 16px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  flex-shrink: 0;
+}
+
+.meet-panel__kick:hover {
+  background: rgba(234, 67, 53, 0.1);
+  border-color: #ea4335;
+}
+
+.meet-panel__kick:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Waiting Overlay
+   ═══════════════════════════════════════════════════════════ */
+
+.meet-waiting {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(32, 33, 36, 0.95);
+  backdrop-filter: blur(8px);
+}
+
+.meet-waiting__card {
+  text-align: center;
+  padding: 2.5rem;
+  background: #292a2d;
+  border-radius: 16px;
+  border: 1px solid #3c4043;
+  max-width: 400px;
+  width: 100%;
+  margin: 0 16px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+.meet-waiting__icon {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: rgba(138, 180, 248, 0.15);
+  color: #8ab4f8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 20px;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Chat panel overrides (keep existing LiveKit chat styling)
+   ═══════════════════════════════════════════════════════════ */
+
+/* Override LiveKit default chat container to fit our panel */
 .custom-chat-container .lk-chat {
   height: 100% !important;
   width: 100% !important;
   background: transparent !important;
   border: none !important;
-  grid-template-rows: 1fr auto !important; /* Discard internal header area */
+  grid-template-rows: 1fr auto !important;
 }
 
-/* Hide the internal chat header, we have our own */
 .custom-chat-container .lk-chat-header {
   display: none !important;
 }
 
-/* Message List */
 .custom-chat-container .lk-chat-messages {
   padding: 1.25rem !important;
   gap: 1rem !important;
 }
 
-/* Single Message Entry Container */
 .custom-chat-container .lk-chat-entry {
   margin: 0 !important;
   display: flex !important;
   flex-direction: column !important;
   gap: 0 !important;
-  border-top: none !important; /* remove border from previous styles */
+  border-top: none !important;
 }
 
-/* Name and Timestamp row */
 .custom-chat-container .lk-meta-data {
   display: flex !important;
   align-items: baseline !important;
@@ -132,53 +679,49 @@ button.lk-button.lk-device-menu-btn:hover {
 .custom-chat-container .lk-participant-name {
   margin: 0 !important;
   font-weight: 600 !important;
-  color: #e7e5e4 !important; /* stone-200 */
+  color: #e8eaed !important;
   font-size: 0.875rem !important;
 }
 
 .custom-chat-container .lk-timestamp {
   margin: 0 !important;
-  color: #78716c !important; /* stone-400 */
+  color: #9aa0a6 !important;
   font-size: 0.75rem !important;
 }
 
-/* Message text (No bubble, just text) */
 .custom-chat-container .lk-message-body {
   background-color: transparent !important;
   padding: 0 !important;
   border-radius: 0 !important;
-  color: #d6d3d1 !important; /* stone-300 */
+  color: #bdc1c6 !important;
   font-size: 0.875rem !important;
   line-height: 1.4 !important;
   max-width: 100% !important;
 }
 
-/* Form container at bottom */
 .custom-chat-container .lk-chat-form {
   padding: 1rem !important;
-  border-top: 1px solid #44403c !important; /* stone-700 */
+  border-top: 1px solid #303134 !important;
   gap: 0.5rem !important;
   align-items: center !important;
   background-color: transparent !important;
 }
 
-/* Pill-shaped input */
 .custom-chat-container .lk-chat-form-input {
-  background-color: #292524 !important; /* stone-800 */
-  border: 1px solid #57534e !important; /* stone-600 */
-  border-radius: 9999px !important; /* Pill shape */
+  background-color: #303134 !important;
+  border: 1px solid #5f6368 !important;
+  border-radius: 9999px !important;
   padding: 0.6rem 1rem !important;
-  color: #e7e5e4 !important;
+  color: #e8eaed !important;
   font-size: 0.875rem !important;
   transition: border-color 0.2s !important;
 }
 
 .custom-chat-container .lk-chat-form-input:focus {
-  border-color: #a8a29e !important; /* stone-400 */
+  border-color: #8ab4f8 !important;
   outline: none !important;
 }
 
-/* Send button styling */
 .custom-chat-container .lk-chat-form .lk-button {
   border-radius: 9999px !important;
   padding: 0 !important;
@@ -188,16 +731,154 @@ button.lk-button.lk-device-menu-btn:hover {
   align-items: center !important;
   justify-content: center !important;
   background-color: transparent !important;
-  color: #a8a29e !important; /* stone-400 */
+  color: #9aa0a6 !important;
   border: none !important;
 }
 
 .custom-chat-container .lk-chat-form .lk-button:hover:not(:disabled) {
-  background-color: #292524 !important; /* stone-800 */
-  color: #e7e5e4 !important; /* stone-200 */
+  background-color: #3c4043 !important;
+  color: #e8eaed !important;
 }
 
 .custom-chat-container .lk-chat-form .lk-button:disabled {
   opacity: 0.5 !important;
   cursor: not-allowed !important;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Chat component wrapper - match panel theme
+   ═══════════════════════════════════════════════════════════ */
+
+/* Override Chat component's bg to match Google Meet dark theme */
+.meet-side-panel .flex.flex-col.w-80,
+.meet-side-panel .flex.flex-col.w-96,
+.meet-side-panel > div {
+  width: 100% !important;
+  background: #202124 !important;
+  border-left: none !important;
+}
+
+.meet-side-panel .bg-stone-800 {
+  background: #202124 !important;
+}
+
+.meet-side-panel .bg-stone-900 {
+  background: #292a2d !important;
+}
+
+.meet-side-panel .border-stone-700 {
+  border-color: #303134 !important;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Hide default LiveKit control bar (we use our own)
+   ═══════════════════════════════════════════════════════════ */
+
+.lk-control-bar {
+  display: none !important;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Mobile Responsive
+   ═══════════════════════════════════════════════════════════ */
+
+@media (max-width: 767px) {
+  .meet-controls {
+    padding: 8px 10px;
+  }
+
+  .meet-controls__left {
+    display: none;
+  }
+
+  .meet-controls__right {
+    display: none;
+  }
+
+  .meet-controls__center {
+    gap: 6px;
+    width: 100%;
+    justify-content: center;
+  }
+
+  .meet-ctrl-btn {
+    height: 36px;
+    padding: 0 10px;
+    font-size: 12px;
+  }
+
+  .meet-ctrl-btn--toggle {
+    width: 36px;
+  }
+
+  .meet-ctrl-btn--leave {
+    padding: 0 14px;
+  }
+
+  .meet-device-select {
+    height: 36px;
+    max-width: 30px;
+  }
+
+  .meet-grid-container {
+    padding: 4px;
+  }
+
+  .meet-grid {
+    gap: 4px;
+  }
+
+  .meet-tile {
+    border-radius: 8px;
+  }
+
+  .meet-tile__overlay {
+    padding: 4px 8px;
+  }
+
+  .meet-tile__name {
+    font-size: 11px;
+  }
+
+  .meet-tile__mic-off {
+    width: 18px;
+    height: 18px;
+  }
+
+  .meet-page-btn {
+    width: 36px;
+    height: 36px;
+  }
+
+  .meet-page-btn--prev {
+    left: 8px;
+  }
+
+  .meet-page-btn--next {
+    right: 8px;
+  }
+
+  .meet-side-panel {
+    width: 100%;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Scrollbar Styling (for side panels)
+   ═══════════════════════════════════════════════════════════ */
+
+.meet-panel__body::-webkit-scrollbar,
+.meet-screenshare__sidebar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.meet-panel__body::-webkit-scrollbar-track,
+.meet-screenshare__sidebar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.meet-panel__body::-webkit-scrollbar-thumb,
+.meet-screenshare__sidebar::-webkit-scrollbar-thumb {
+  background: #5f6368;
+  border-radius: 3px;
 }

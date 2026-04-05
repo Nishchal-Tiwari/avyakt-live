@@ -77,4 +77,6 @@ export interface JoinMeetingResponse {
   url: string;
   roomName: string;
   redirectUrl?: string;
+  teacherName: string;
+  teacherEmail: string;
 }

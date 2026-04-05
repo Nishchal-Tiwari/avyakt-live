@@ -9,6 +9,7 @@ export default defineConfig({
   },
   server: {
     port: 5173,
+    allowedHosts: ["live.avyakt-ehsaas.in"],
     proxy: {
       "/api": {
         target: "http://localhost:4000",

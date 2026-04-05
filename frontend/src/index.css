@@ -5,3 +5,88 @@
 body {
   @apply bg-stone-50 text-stone-900 antialiased;
 }
+
+/* Override LiveKit component styles to prevent double-screen issue */
+.lk-video-conference {
+  height: 100% !important;
+  max-height: 100% !important;
+}
+
+.lk-video-conference-inner {
+  height: 100% !important;
+}
+
+/* Hide the default LiveKit control bar since we have our own MeetingBar */
+.lk-video-conference .lk-control-bar {
+  display: none !important;
+}
+
+/* ── MediaDeviceMenu dropdown styling ── */
+
+/* Ensure the menu wrapper doesn't clip the dropdown */
+.lk-button-group-menu {
+  overflow: visible !important;
+}
+
+.lk-device-menu {
+  position: absolute !important;
+  top: 100% !important;   /* below the button instead of on top of it */
+  left: auto !important;
+  right: 0 !important;
+  z-index: 99999 !important;
+  background: #292524 !important; /* stone-800 */
+  border: 1px solid #57534e !important; /* stone-600 */
+  border-radius: 0.5rem !important;
+  padding: 0.375rem !important;
+  min-width: 14rem !important;
+  margin-top: 0.25rem !important;
+  box-shadow: 0 20px 48px rgba(0,0,0,0.5) !important;
+}
+
+/* Device list items */
+.lk-device-menu .lk-device-list,
+.lk-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.lk-device-menu .lk-device-list li,
+.lk-list li {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.45rem 0.5rem;
+  border-radius: 0.375rem;
+  color: #e7e5e4 !important; /* stone-200 */
+  font-size: 0.8125rem;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.lk-device-menu .lk-device-list li:hover,
+.lk-list li:hover {
+  background: #44403c !important; /* stone-700 */
+}
+
+.lk-device-menu .lk-device-list li[data-lk-active="true"],
+.lk-device-menu .lk-device-list li.lk-active,
+.lk-list li[data-lk-active="true"],
+.lk-list li.lk-active {
+  background: #065f46 !important; /* emerald-800 */
+  color: #d1fae5 !important; /* emerald-100 */
+}
+
+/* Style the MediaDeviceMenu trigger button */
+button.lk-button.lk-device-menu-btn {
+  padding: 0.5rem !important;
+  border-radius: 0 0.5rem 0.5rem 0 !important;
+  background: #57534e !important;
+  color: white !important;
+  font-size: 0.75rem !important;
+  border-left: 1px solid #78716c !important;
+}
+
+button.lk-button.lk-device-menu-btn:hover {
+  background: #78716c !important;
+}

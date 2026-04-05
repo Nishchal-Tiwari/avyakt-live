@@ -255,7 +255,10 @@ export async function disinviteFromClass(req: Request, res: Response): Promise<v
 export async function joinMeeting(req: Request, res: Response): Promise<void> {
   try {
     const id = classIdParam(req);
-    const cls = await prisma.class.findUnique({ where: { id } });
+    const cls = await prisma.class.findUnique({ 
+      where: { id },
+      include: { teacher: { select: { email: true, name: true } } }
+    });
 
     if (!cls) {
       res.status(404).json({ error: "Class not found" });
@@ -293,6 +296,8 @@ export async function joinMeeting(req: Request, res: Response): Promise<void> {
       url: env.LIVEKIT_URL.trim(),
       roomName: cls.roomName,
       redirectUrl: cls.redirectUrl ?? undefined,
+      teacherName: cls.teacher.name || cls.teacher.email,
+      teacherEmail: cls.teacher.email,
     });
   } catch (err) {
     console.error("Join meeting error:", err);

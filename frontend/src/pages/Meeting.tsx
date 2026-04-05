@@ -34,7 +34,6 @@ function NativeDeviceSelect({ kind }: { kind: MediaDeviceKind }) {
     const deviceId = e.target.value;
     setActiveId(deviceId);
     try {
-      const trackSource = kind === "audioinput" ? Track.Source.Microphone : Track.Source.Camera;
       await room.switchActiveDevice(kind, deviceId);
     } catch (err) {
       console.error("Failed to switch device:", err);
@@ -175,15 +174,39 @@ function MeetingBar({
 function MeetingInner({
   classId,
   isTeacher,
+  teacherName,
+  teacherEmail,
 }: {
   classId: string;
   isTeacher: boolean;
+  teacherName: string;
+  teacherEmail: string;
 }) {
+  const participants = useParticipants();
+  
+  // If we're not the teacher, we wait until the teacher is in the room.
+  const isTeacherPresent = isTeacher || participants.some((p) => p.identity === teacherEmail);
+
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full bg-stone-900">
       <MeetingBar classId={classId} isTeacher={isTeacher} />
-      <div className="flex-1 min-h-0 overflow-hidden">
-        <VideoConference />
+      <div className="flex-1 min-h-0 overflow-hidden relative">
+        {!isTeacherPresent ? (
+          <div className="absolute inset-0 z-10 flex items-center justify-center bg-stone-900/95 backdrop-blur-sm">
+            <div className="text-center p-8 bg-stone-800 rounded-xl shadow-2xl border border-stone-700 max-w-md w-full mx-4">
+              <div className="w-16 h-16 rounded-full bg-emerald-500/20 text-emerald-500 flex items-center justify-center mx-auto mb-4">
+                <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <h2 className="text-xl font-semibold text-white mb-2">Waiting for Host</h2>
+              <p className="text-stone-400">
+                Please wait until <span className="font-medium text-stone-200">{teacherName}</span> starts the meeting.
+              </p>
+            </div>
+          </div>
+        ) : null}
+        {isTeacherPresent || isTeacher ? <VideoConference /> : null}
       </div>
     </div>
   );
@@ -294,7 +317,12 @@ export default function Meeting() {
         }}
         style={{ height: "100%" }}
       >
-        <MeetingInner classId={classId!} isTeacher={user!.role === "TEACHER"} />
+        <MeetingInner 
+          classId={classId!} 
+          isTeacher={user!.role === "TEACHER"} 
+          teacherName={tokenData.teacherName || "the Host"}
+          teacherEmail={tokenData.teacherEmail || ""}
+        />
       </LiveKitRoom>
     </div>
   );

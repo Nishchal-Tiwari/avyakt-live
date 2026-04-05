@@ -7,6 +7,7 @@
     "dev:frontend": "npm run dev --prefix frontend"
   },
   "devDependencies": {
-    "concurrently": "^9.1.0"
+    "concurrently": "^9.1.0",
+    "puppeteer": "^24.40.0"
   }
 }

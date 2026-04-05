@@ -90,3 +90,114 @@ button.lk-button.lk-device-menu-btn {
 button.lk-button.lk-device-menu-btn:hover {
   background: #78716c !important;
 }
+
+/* ── Custom Chat Styling (Google Meet Inspired) ── */
+.custom-chat-container .lk-chat {
+  height: 100% !important;
+  width: 100% !important;
+  background: transparent !important;
+  border: none !important;
+  grid-template-rows: 1fr auto !important; /* Discard internal header area */
+}
+
+/* Hide the internal chat header, we have our own */
+.custom-chat-container .lk-chat-header {
+  display: none !important;
+}
+
+/* Message List */
+.custom-chat-container .lk-chat-messages {
+  padding: 1.25rem !important;
+  gap: 1rem !important;
+}
+
+/* Single Message Entry Container */
+.custom-chat-container .lk-chat-entry {
+  margin: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 0 !important;
+  border-top: none !important; /* remove border from previous styles */
+}
+
+/* Name and Timestamp row */
+.custom-chat-container .lk-meta-data {
+  display: flex !important;
+  align-items: baseline !important;
+  gap: 0.5rem !important;
+  padding: 0 !important;
+  margin-bottom: 0.25rem !important;
+}
+
+.custom-chat-container .lk-participant-name {
+  margin: 0 !important;
+  font-weight: 600 !important;
+  color: #e7e5e4 !important; /* stone-200 */
+  font-size: 0.875rem !important;
+}
+
+.custom-chat-container .lk-timestamp {
+  margin: 0 !important;
+  color: #78716c !important; /* stone-400 */
+  font-size: 0.75rem !important;
+}
+
+/* Message text (No bubble, just text) */
+.custom-chat-container .lk-message-body {
+  background-color: transparent !important;
+  padding: 0 !important;
+  border-radius: 0 !important;
+  color: #d6d3d1 !important; /* stone-300 */
+  font-size: 0.875rem !important;
+  line-height: 1.4 !important;
+  max-width: 100% !important;
+}
+
+/* Form container at bottom */
+.custom-chat-container .lk-chat-form {
+  padding: 1rem !important;
+  border-top: 1px solid #44403c !important; /* stone-700 */
+  gap: 0.5rem !important;
+  align-items: center !important;
+  background-color: transparent !important;
+}
+
+/* Pill-shaped input */
+.custom-chat-container .lk-chat-form-input {
+  background-color: #292524 !important; /* stone-800 */
+  border: 1px solid #57534e !important; /* stone-600 */
+  border-radius: 9999px !important; /* Pill shape */
+  padding: 0.6rem 1rem !important;
+  color: #e7e5e4 !important;
+  font-size: 0.875rem !important;
+  transition: border-color 0.2s !important;
+}
+
+.custom-chat-container .lk-chat-form-input:focus {
+  border-color: #a8a29e !important; /* stone-400 */
+  outline: none !important;
+}
+
+/* Send button styling */
+.custom-chat-container .lk-chat-form .lk-button {
+  border-radius: 9999px !important;
+  padding: 0 !important;
+  width: 2.5rem !important;
+  height: 2.5rem !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  background-color: transparent !important;
+  color: #a8a29e !important; /* stone-400 */
+  border: none !important;
+}
+
+.custom-chat-container .lk-chat-form .lk-button:hover:not(:disabled) {
+  background-color: #292524 !important; /* stone-800 */
+  color: #e7e5e4 !important; /* stone-200 */
+}
+
+.custom-chat-container .lk-chat-form .lk-button:disabled {
+  opacity: 0.5 !important;
+  cursor: not-allowed !important;
+}

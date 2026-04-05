@@ -14,6 +14,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { api, type JoinMeetingResponse } from "@/lib/api";
 import "@livekit/components-styles";
 
+import Chat from "@/components/Chat";
+
 /* ── Native <select> device picker — immune to CSS z-index/overflow issues ── */
 function NativeDeviceSelect({ kind }: { kind: MediaDeviceKind }) {
   const room = useRoomContext();
@@ -40,7 +42,7 @@ function NativeDeviceSelect({ kind }: { kind: MediaDeviceKind }) {
     }
   }
 
-  if (devices.length <= 1) return null; // no point showing picker with 0-1 devices
+  if (devices.length <= 1) return null;
 
   return (
     <select
@@ -62,9 +64,11 @@ function NativeDeviceSelect({ kind }: { kind: MediaDeviceKind }) {
 function MeetingBar({
   classId,
   isTeacher,
+  onToggleChat,
 }: {
   classId: string;
   isTeacher: boolean;
+  onToggleChat: () => void;
 }) {
   const participants = useParticipants();
   const { localParticipant } = useLocalParticipant();
@@ -99,14 +103,6 @@ function MeetingBar({
     <div className="flex items-center justify-center gap-2 flex-wrap bg-stone-900/90 backdrop-blur px-4 py-3 border-b border-stone-700">
       {isTeacher && (
         <>
-          <button
-            type="button"
-            onClick={handleEndMeeting}
-            disabled={ending}
-            className="px-4 py-2 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700 disabled:opacity-50"
-          >
-            {ending ? "Ending…" : "End meeting"}
-          </button>
           {others.length > 0 && (
             <div className="relative group">
               <button
@@ -162,11 +158,31 @@ function MeetingBar({
       >
         Share screen
       </TrackToggle>
-      <DisconnectButton
-        className="px-4 py-2 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700"
+
+      <button
+        type="button"
+        onClick={onToggleChat}
+        className="px-4 py-2 rounded-lg bg-stone-700 text-white text-sm font-medium hover:bg-stone-600"
       >
-        Leave
-      </DisconnectButton>
+        Chat
+      </button>
+
+      {isTeacher ? (
+        <button
+          type="button"
+          onClick={handleEndMeeting}
+          disabled={ending}
+          className="px-4 py-2 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700 disabled:opacity-50"
+        >
+          {ending ? "Ending…" : "End meeting"}
+        </button>
+      ) : (
+        <DisconnectButton
+          className="px-4 py-2 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700"
+        >
+          Leave
+        </DisconnectButton>
+      )}
     </div>
   );
 }
@@ -183,30 +199,41 @@ function MeetingInner({
   teacherEmail: string;
 }) {
   const participants = useParticipants();
+  const [isChatOpen, setIsChatOpen] = useState(false);
   
   // If we're not the teacher, we wait until the teacher is in the room.
   const isTeacherPresent = isTeacher || participants.some((p) => p.identity === teacherEmail);
 
   return (
     <div className="flex flex-col h-full bg-stone-900">
-      <MeetingBar classId={classId} isTeacher={isTeacher} />
-      <div className="flex-1 min-h-0 overflow-hidden relative">
-        {!isTeacherPresent ? (
-          <div className="absolute inset-0 z-10 flex items-center justify-center bg-stone-900/95 backdrop-blur-sm">
-            <div className="text-center p-8 bg-stone-800 rounded-xl shadow-2xl border border-stone-700 max-w-md w-full mx-4">
-              <div className="w-16 h-16 rounded-full bg-emerald-500/20 text-emerald-500 flex items-center justify-center mx-auto mb-4">
-                <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
+      <MeetingBar 
+        classId={classId} 
+        isTeacher={isTeacher} 
+        onToggleChat={() => setIsChatOpen(!isChatOpen)}
+      />
+      <div className="flex-1 min-h-0 flex flex-row overflow-hidden relative">
+        <div className="flex-1 min-w-0 relative h-full">
+          {!isTeacherPresent ? (
+            <div className="absolute inset-0 z-10 flex items-center justify-center bg-stone-900/95 backdrop-blur-sm">
+              <div className="text-center p-8 bg-stone-800 rounded-xl shadow-2xl border border-stone-700 max-w-md w-full mx-4">
+                <div className="w-16 h-16 rounded-full bg-emerald-500/20 text-emerald-500 flex items-center justify-center mx-auto mb-4">
+                  <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <h2 className="text-xl font-semibold text-white mb-2">Waiting for Host</h2>
+                <p className="text-stone-400">
+                  Please wait until <span className="font-medium text-stone-200">{teacherName}</span> starts the meeting.
+                </p>
               </div>
-              <h2 className="text-xl font-semibold text-white mb-2">Waiting for Host</h2>
-              <p className="text-stone-400">
-                Please wait until <span className="font-medium text-stone-200">{teacherName}</span> starts the meeting.
-              </p>
             </div>
-          </div>
-        ) : null}
-        {isTeacherPresent || isTeacher ? <VideoConference /> : null}
+          ) : null}
+          {isTeacherPresent || isTeacher ? <VideoConference /> : null}
+        </div>
+        
+        {isChatOpen && (
+          <Chat onClose={() => setIsChatOpen(false)} />
+        )}
       </div>
     </div>
   );

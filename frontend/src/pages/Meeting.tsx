@@ -19,11 +19,18 @@ import {
 } from "@livekit/components-react";
 import type { TrackReferenceOrPlaceholder } from "@livekit/components-react";
 import { isTrackReferencePinned } from "@livekit/components-core";
-import { Track } from "livekit-client";
+import {
+  Track,
+  RoomEvent,
+  type ScreenShareCaptureOptions,
+  type Participant,
+} from "livekit-client";
 import { useAuth } from "@/contexts/AuthContext";
 import { api, type JoinMeetingResponse } from "@/lib/api";
 import "@livekit/components-styles";
 import Chat from "@/components/Chat";
+
+const MEDIA_POLICY_MSG = "mediaPolicy";
 
 /* ═══════════════════════════════════════════════════════════
    Hooks & Utilities
@@ -535,6 +542,189 @@ function ParticipantsPanel({
 }
 
 /* ═══════════════════════════════════════════════════════════
+   Host media policy (camera / mic required for students)
+   ═══════════════════════════════════════════════════════════ */
+
+function MeetingPolicySync({
+  classId,
+  teacherEmail,
+  isTeacher,
+  onRemotePolicy,
+}: {
+  classId: string;
+  teacherEmail: string;
+  isTeacher: boolean;
+  onRemotePolicy: (p: { requireCamera: boolean; requireMic: boolean }) => void;
+}) {
+  const room = useRoomContext();
+
+  useEffect(() => {
+    if (isTeacher || !room) return;
+    const onData = (payload: Uint8Array, participant?: Participant) => {
+      if (!participant || participant.identity !== teacherEmail) return;
+      try {
+        const msg = JSON.parse(new TextDecoder().decode(payload)) as {
+          type?: string;
+          requireCamera?: boolean;
+          requireMic?: boolean;
+        };
+        if (
+          msg?.type === MEDIA_POLICY_MSG &&
+          typeof msg.requireCamera === "boolean" &&
+          typeof msg.requireMic === "boolean"
+        ) {
+          onRemotePolicy({ requireCamera: msg.requireCamera, requireMic: msg.requireMic });
+        }
+      } catch {
+        /* ignore malformed payloads */
+      }
+    };
+    room.on(RoomEvent.DataReceived, onData);
+    return () => {
+      room.off(RoomEvent.DataReceived, onData);
+    };
+  }, [room, isTeacher, teacherEmail, onRemotePolicy]);
+
+  useEffect(() => {
+    if (isTeacher || !classId) return;
+    let cancelled = false;
+    async function poll() {
+      try {
+        const cls = await api.get<{ requireCamera?: boolean; requireMic?: boolean }>(
+          `/classes/${classId}`,
+        );
+        if (cancelled) return;
+        onRemotePolicy({
+          requireCamera: Boolean(cls.requireCamera),
+          requireMic: Boolean(cls.requireMic),
+        });
+      } catch {
+        /* ignore */
+      }
+    }
+    void poll();
+    const id = window.setInterval(poll, 20000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, [classId, isTeacher, onRemotePolicy]);
+
+  return null;
+}
+
+/**
+ * Students only: host can require camera and/or mic. Until they accept, local A/V stays off
+ * and meeting content (remote A/V) is hidden. Accept → enable only what’s required. Decline → disconnect.
+ */
+function MediaConsentGate({
+  isTeacher,
+  requireCamera,
+  requireMic,
+  teacherName,
+  children,
+}: {
+  isTeacher: boolean;
+  requireCamera: boolean;
+  requireMic: boolean;
+  teacherName: string;
+  children: React.ReactNode;
+}) {
+  const room = useRoomContext();
+  const { localParticipant, isCameraEnabled, isMicrophoneEnabled } = useLocalParticipant();
+  const [consentBusy, setConsentBusy] = useState(false);
+  const strippedForPromptRef = useRef(false);
+
+  const blocked =
+    !isTeacher &&
+    ((requireCamera && !isCameraEnabled) || (requireMic && !isMicrophoneEnabled));
+
+  const needCamera = requireCamera && !isCameraEnabled;
+  const needMic = requireMic && !isMicrophoneEnabled;
+
+  useEffect(() => {
+    if (isTeacher || !localParticipant) return;
+    if (!blocked) {
+      strippedForPromptRef.current = false;
+      return;
+    }
+    if (strippedForPromptRef.current || consentBusy) return;
+    strippedForPromptRef.current = true;
+    void localParticipant.setCameraEnabled(false);
+    void localParticipant.setMicrophoneEnabled(false);
+  }, [blocked, consentBusy, isTeacher, localParticipant]);
+
+  async function handleAccept() {
+    if (!localParticipant || consentBusy) return;
+    setConsentBusy(true);
+    strippedForPromptRef.current = false;
+    try {
+      if (requireCamera) await localParticipant.setCameraEnabled(true);
+      if (requireMic) await localParticipant.setMicrophoneEnabled(true);
+      const camOk = !requireCamera || localParticipant.isCameraEnabled;
+      const micOk = !requireMic || localParticipant.isMicrophoneEnabled;
+      if (!camOk || !micOk) {
+        throw new Error("Camera or microphone could not be enabled");
+      }
+    } catch {
+      void room.disconnect();
+    } finally {
+      setConsentBusy(false);
+    }
+  }
+
+  function handleDecline() {
+    void room.disconnect();
+  }
+
+  if (isTeacher) {
+    return <>{children}</>;
+  }
+
+  return (
+    <>
+      {!blocked && children}
+      {blocked && (
+        <div
+          className="meet-media-gate"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="meet-media-gate-title"
+        >
+          <div className="meet-media-gate__card">
+            <h2 id="meet-media-gate-title" className="meet-media-gate__title">
+              {teacherName} requires {needCamera && needMic ? "camera and microphone" : needCamera ? "camera" : "microphone"}
+            </h2>
+            <p className="meet-media-gate__text">
+              Your camera and microphone stay off until you continue. The meeting audio and video are hidden until
+              you allow the required device{needCamera && needMic ? "s" : ""}. If you decline, you will leave the meeting.
+            </p>
+            <div className="meet-media-gate__actions">
+              <button
+                type="button"
+                className="meet-media-gate__btn meet-media-gate__btn--primary"
+                disabled={consentBusy}
+                onClick={() => void handleAccept()}
+              >
+                {consentBusy ? "Enabling…" : needCamera && needMic ? "Turn on camera & mic" : needCamera ? "Turn on camera" : "Turn on microphone"}
+              </button>
+              <button
+                type="button"
+                className="meet-media-gate__btn meet-media-gate__btn--ghost"
+                disabled={consentBusy}
+                onClick={handleDecline}
+              >
+                Decline and leave
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════
    Bottom Control Bar (Google Meet style)
    ═══════════════════════════════════════════════════════════ */
 
@@ -545,6 +735,10 @@ function BottomControlBar({
   isPeopleOpen,
   onToggleChat,
   onTogglePeople,
+  requireCameraPolicy,
+  requireMicPolicy,
+  onToggleRequireCamera,
+  onToggleRequireMic,
 }: {
   classId: string;
   isTeacher: boolean;
@@ -552,11 +746,25 @@ function BottomControlBar({
   isPeopleOpen: boolean;
   onToggleChat: () => void;
   onTogglePeople: () => void;
+  requireCameraPolicy: boolean;
+  requireMicPolicy: boolean;
+  onToggleRequireCamera: (next: boolean) => void;
+  onToggleRequireMic: (next: boolean) => void;
 }) {
   const participants = useParticipants();
   const isMobile = useIsMobile();
   const timer = useMeetingTimer();
   const [ending, setEnding] = useState(false);
+  /** When true, the next screen-capture prompt asks for tab/system audio (browser-dependent). */
+  const [screenShareWithAudio, setScreenShareWithAudio] = useState(true);
+
+  const screenShareCaptureOptions = useMemo<ScreenShareCaptureOptions>(
+    () =>
+      screenShareWithAudio
+        ? { audio: true, systemAudio: "include" }
+        : { audio: false },
+    [screenShareWithAudio],
+  );
 
   async function handleEndMeeting() {
     setEnding(true);
@@ -598,10 +806,22 @@ function BottomControlBar({
         </div>
 
         {!isMobile && (
-          <TrackToggle
-            source={Track.Source.ScreenShare}
-            className="meet-ctrl-btn meet-ctrl-btn--toggle meet-ctrl-btn--share"
-          />
+          <div className="meet-controls__btn-group meet-controls__btn-group--screenshare">
+            <label className="meet-screenshare-audio">
+              <input
+                type="checkbox"
+                checked={screenShareWithAudio}
+                onChange={(e) => setScreenShareWithAudio(e.target.checked)}
+                title="Include audio from the shared tab or system when the browser supports it"
+              />
+              <span>Share audio</span>
+            </label>
+            <TrackToggle
+              source={Track.Source.ScreenShare}
+              captureOptions={screenShareCaptureOptions}
+              className="meet-ctrl-btn meet-ctrl-btn--toggle meet-ctrl-btn--share"
+            />
+          </div>
         )}
 
         <button
@@ -624,6 +844,30 @@ function BottomControlBar({
             <span className="meet-ctrl-btn__badge">{participants.length}</span>
           )}
         </button>
+
+        {isTeacher && (
+          <div
+            className="meet-policy-toggles"
+            title="Students must keep camera or microphone on (when checked) to use the meeting."
+          >
+            <label className="meet-policy-toggle">
+              <input
+                type="checkbox"
+                checked={requireCameraPolicy}
+                onChange={(e) => onToggleRequireCamera(e.target.checked)}
+              />
+              <span>{isMobile ? "Req. cam" : "Require camera"}</span>
+            </label>
+            <label className="meet-policy-toggle">
+              <input
+                type="checkbox"
+                checked={requireMicPolicy}
+                onChange={(e) => onToggleRequireMic(e.target.checked)}
+              />
+              <span>{isMobile ? "Req. mic" : "Require mic"}</span>
+            </label>
+          </div>
+        )}
 
         {isTeacher ? (
           <button
@@ -658,15 +902,72 @@ function MeetingInner({
   isTeacher,
   teacherName,
   teacherEmail,
+  initialRequireCamera,
+  initialRequireMic,
 }: {
   classId: string;
   isTeacher: boolean;
   teacherName: string;
   teacherEmail: string;
+  initialRequireCamera: boolean;
+  initialRequireMic: boolean;
 }) {
+  const room = useRoomContext();
   const participants = useParticipants();
   const isMobile = useIsMobile();
   const [panel, setPanel] = useState<SidePanel>(null);
+  const [requireCamera, setRequireCamera] = useState(initialRequireCamera);
+  const [requireMic, setRequireMic] = useState(initialRequireMic);
+
+  const applyRemotePolicy = useCallback((p: { requireCamera: boolean; requireMic: boolean }) => {
+    setRequireCamera(p.requireCamera);
+    setRequireMic(p.requireMic);
+  }, []);
+
+  const broadcastPolicy = useCallback(
+    async (camera: boolean, mic: boolean) => {
+      if (!room) return;
+      try {
+        const enc = new TextEncoder().encode(
+          JSON.stringify({ type: MEDIA_POLICY_MSG, requireCamera: camera, requireMic: mic }),
+        );
+        await room.localParticipant.publishData(enc, { reliable: true });
+      } catch (e) {
+        console.warn("publishData policy failed", e);
+      }
+    },
+    [room],
+  );
+
+  const handleToggleRequireCamera = useCallback(
+    async (next: boolean) => {
+      const prevCam = requireCamera;
+      setRequireCamera(next);
+      try {
+        await api.patch(`/classes/${classId}`, { requireCamera: next });
+        await broadcastPolicy(next, requireMic);
+      } catch (e) {
+        console.error(e);
+        setRequireCamera(prevCam);
+      }
+    },
+    [classId, requireCamera, requireMic, broadcastPolicy],
+  );
+
+  const handleToggleRequireMic = useCallback(
+    async (next: boolean) => {
+      const prevMic = requireMic;
+      setRequireMic(next);
+      try {
+        await api.patch(`/classes/${classId}`, { requireMic: next });
+        await broadcastPolicy(requireCamera, next);
+      } catch (e) {
+        console.error(e);
+        setRequireMic(prevMic);
+      }
+    },
+    [classId, requireCamera, requireMic, broadcastPolicy],
+  );
 
   const isTeacherPresent =
     isTeacher || participants.some((p) => p.identity === teacherEmail);
@@ -676,55 +977,74 @@ function MeetingInner({
 
   return (
     <div className="meet-root">
-      <RoomAudioRenderer />
-      <RoomChatBootstrap />
+      <MeetingPolicySync
+        classId={classId}
+        teacherEmail={teacherEmail}
+        isTeacher={isTeacher}
+        onRemotePolicy={applyRemotePolicy}
+      />
+      <MediaConsentGate
+        isTeacher={isTeacher}
+        requireCamera={requireCamera}
+        requireMic={requireMic}
+        teacherName={teacherName}
+      >
+        <RoomAudioRenderer />
+        <RoomChatBootstrap />
 
-      <div className="meet-body">
-        {/* Main video area */}
-        <div className={`meet-content${panel && !isMobile ? " meet-content--with-panel" : ""}`}>
-          {!isTeacherPresent && (
-            <div className="meet-waiting">
-              <div className="meet-waiting__card">
-                <div className="meet-waiting__icon">
-                  <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
+        <div className="meet-body">
+          <div className={`meet-content${panel && !isMobile ? " meet-content--with-panel" : ""}`}>
+            {!isTeacherPresent && (
+              <div className="meet-waiting">
+                <div className="meet-waiting__card">
+                  <div className="meet-waiting__icon">
+                    <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <h2 className="text-xl font-semibold text-white mb-2">Waiting for Host</h2>
+                  <p className="text-stone-400">
+                    Please wait until{" "}
+                    <span className="font-medium text-stone-200">{teacherName}</span>{" "}
+                    starts the meeting.
+                  </p>
                 </div>
-                <h2 className="text-xl font-semibold text-white mb-2">Waiting for Host</h2>
-                <p className="text-stone-400">
-                  Please wait until{" "}
-                  <span className="font-medium text-stone-200">{teacherName}</span>{" "}
-                  starts the meeting.
-                </p>
               </div>
+            )}
+            {(isTeacherPresent || isTeacher) && <VideoGrid />}
+          </div>
+
+          {panel && (
+            <div className={`meet-side-panel${isMobile ? " meet-side-panel--mobile" : ""}`}>
+              {panel === "chat" && <Chat onClose={() => setPanel(null)} />}
+              {panel === "people" && (
+                <ParticipantsPanel
+                  classId={classId}
+                  isTeacher={isTeacher}
+                  onClose={() => setPanel(null)}
+                />
+              )}
             </div>
           )}
-          {(isTeacherPresent || isTeacher) && <VideoGrid />}
         </div>
 
-        {/* Side panel */}
-        {panel && (
-          <div className={`meet-side-panel${isMobile ? " meet-side-panel--mobile" : ""}`}>
-            {panel === "chat" && <Chat onClose={() => setPanel(null)} />}
-            {panel === "people" && (
-              <ParticipantsPanel
-                classId={classId}
-                isTeacher={isTeacher}
-                onClose={() => setPanel(null)}
-              />
-            )}
-          </div>
-        )}
-      </div>
-
-      <BottomControlBar
-        classId={classId}
-        isTeacher={isTeacher}
-        isChatOpen={panel === "chat"}
-        isPeopleOpen={panel === "people"}
-        onToggleChat={() => togglePanel("chat")}
-        onTogglePeople={() => togglePanel("people")}
-      />
+        <BottomControlBar
+          classId={classId}
+          isTeacher={isTeacher}
+          isChatOpen={panel === "chat"}
+          isPeopleOpen={panel === "people"}
+          onToggleChat={() => togglePanel("chat")}
+          onTogglePeople={() => togglePanel("people")}
+          requireCameraPolicy={requireCamera}
+          requireMicPolicy={requireMic}
+          onToggleRequireCamera={(next) => {
+            void handleToggleRequireCamera(next);
+          }}
+          onToggleRequireMic={(next) => {
+            void handleToggleRequireMic(next);
+          }}
+        />
+      </MediaConsentGate>
     </div>
   );
 }
@@ -797,6 +1117,10 @@ export default function Meeting() {
   }
 
   const hasValidUrl = (tokenData?.url?.trim() ?? "").length > 0;
+  const isTeacherUser = user?.role === "TEACHER";
+  const studentNeedsMediaConsent =
+    !isTeacherUser &&
+    (Boolean(tokenData?.requireCamera) || Boolean(tokenData?.requireMic));
 
   if (error || !tokenData || !hasValidUrl) {
     return (
@@ -830,8 +1154,8 @@ export default function Meeting() {
         serverUrl={tokenData.url}
         token={tokenData.token}
         connect={true}
-        audio={true}
-        video={true}
+        audio={!studentNeedsMediaConsent}
+        video={!studentNeedsMediaConsent}
         onDisconnected={() => redirectTo("/dashboard")}
         onError={(e) => {
           console.error("LiveKit error", e);
@@ -845,6 +1169,8 @@ export default function Meeting() {
             isTeacher={user!.role === "TEACHER"}
             teacherName={tokenData.teacherName || "the Host"}
             teacherEmail={tokenData.teacherEmail || ""}
+            initialRequireCamera={Boolean(tokenData.requireCamera)}
+            initialRequireMic={Boolean(tokenData.requireMic)}
           />
         </LayoutContextProvider>
       </LiveKitRoom>

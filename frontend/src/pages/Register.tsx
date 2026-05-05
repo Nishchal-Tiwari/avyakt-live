@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { getSafeRedirectPath } from "@/lib/redirect";
 
 export default function Register() {
   const [email, setEmail] = useState("");
@@ -11,6 +12,12 @@ export default function Register() {
   const [submitting, setSubmitting] = useState(false);
   const { register } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const redirectParam = searchParams.get("redirect");
+  const afterAuthPath = getSafeRedirectPath(redirectParam) ?? "/dashboard";
+  const loginHref = redirectParam
+    ? `/login?redirect=${encodeURIComponent(redirectParam)}`
+    : "/login";
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -18,7 +25,7 @@ export default function Register() {
     setSubmitting(true);
     try {
       await register(email, password, name || undefined, role);
-      navigate("/dashboard");
+      navigate(afterAuthPath, { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Registration failed");
     } finally {
@@ -124,7 +131,7 @@ export default function Register() {
           </button>
           <p className="mt-6 text-center text-sm text-stone-500">
             Already have an account?{" "}
-            <Link to="/login" className="text-emerald-600 font-medium hover:underline">
+            <Link to={loginHref} className="text-emerald-600 font-medium hover:underline">
               Sign in
             </Link>
           </p>

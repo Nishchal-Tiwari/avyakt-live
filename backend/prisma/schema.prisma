@@ -35,6 +35,10 @@ model Class {
   updatedAt   DateTime @updatedAt
   roomName    String   @unique
   redirectUrl String?  // optional URL to redirect when meeting ends or user disconnects
+  /// When true, students must keep the camera on to use the meeting UI.
+  requireCamera Boolean @default(false)
+  /// When true, students must keep the microphone on to use the meeting UI.
+  requireMic    Boolean @default(false)
 
   invites    ClassInvite[]
   attendance Attendance[]

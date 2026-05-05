@@ -1,5 +1,9 @@
 import type { Request, Response } from "express";
 import { prisma } from "../lib/prisma.js";
+import {
+  DB_SCHEMA_OUT_OF_SYNC_MESSAGE,
+  isPrismaMissingColumnError,
+} from "../lib/prismaErrors.js";
 import { createLiveKitToken } from "../services/livekit.js";
 import { RoomServiceClient } from "livekit-server-sdk";
 import { env } from "../config/env.js";
@@ -7,6 +11,14 @@ import { env } from "../config/env.js";
 function classIdParam(req: Request): string {
   const id = req.params.id;
   return Array.isArray(id) ? id[0] ?? "" : id ?? "";
+}
+
+function optionalBoolField(body: Record<string, unknown>, key: string): boolean | undefined {
+  const v = body[key];
+  if (typeof v === "boolean") return v;
+  if (v === "true" || v === 1) return true;
+  if (v === "false" || v === 0) return false;
+  return undefined;
 }
 
 const livekitHostRaw = env.LIVEKIT_INTERNAL_URL || env.LIVEKIT_URL;
@@ -48,6 +60,10 @@ export async function listClasses(req: Request, res: Response): Promise<void> {
     });
   } catch (err) {
     console.error("List classes error:", err);
+    if (isPrismaMissingColumnError(err)) {
+      res.status(503).json({ error: DB_SCHEMA_OUT_OF_SYNC_MESSAGE });
+      return;
+    }
     res.status(500).json({ error: "Failed to list classes" });
   }
 }
@@ -55,11 +71,14 @@ export async function listClasses(req: Request, res: Response): Promise<void> {
 export async function createClass(req: Request, res: Response): Promise<void> {
   try {
     const userId = req.user!.id;
-    const { name, description, redirectUrl } = req.body as {
+    const raw = req.body as Record<string, unknown>;
+    const { name, description, redirectUrl } = raw as {
       name?: string;
       description?: string;
       redirectUrl?: string;
     };
+    const requireCamera = optionalBoolField(raw, "requireCamera") ?? false;
+    const requireMic = optionalBoolField(raw, "requireMic") ?? false;
 
     if (!name?.trim()) {
       res.status(400).json({ error: "Class name is required" });
@@ -76,6 +95,8 @@ export async function createClass(req: Request, res: Response): Promise<void> {
         teacherId: userId,
         roomName,
         redirectUrl: redirect,
+        requireCamera,
+        requireMic,
       },
       include: { teacher: { select: { email: true, name: true } } },
     });
@@ -86,11 +107,17 @@ export async function createClass(req: Request, res: Response): Promise<void> {
       description: cls.description,
       roomName: cls.roomName,
       redirectUrl: cls.redirectUrl,
+      requireCamera: cls.requireCamera,
+      requireMic: cls.requireMic,
       teacher: cls.teacher,
       createdAt: cls.createdAt,
     });
   } catch (err) {
     console.error("Create class error:", err);
+    if (isPrismaMissingColumnError(err)) {
+      res.status(503).json({ error: DB_SCHEMA_OUT_OF_SYNC_MESSAGE });
+      return;
+    }
     res.status(500).json({ error: "Failed to create class" });
   }
 }
@@ -128,12 +155,18 @@ export async function getClass(req: Request, res: Response): Promise<void> {
       description: cls.description,
       roomName: cls.roomName,
       redirectUrl: cls.redirectUrl ?? undefined,
+      requireCamera: cls.requireCamera,
+      requireMic: cls.requireMic,
       teacher: cls.teacher,
       invites: cls.invites,
       createdAt: cls.createdAt,
     });
   } catch (err) {
     console.error("Get class error:", err);
+    if (isPrismaMissingColumnError(err)) {
+      res.status(503).json({ error: DB_SCHEMA_OUT_OF_SYNC_MESSAGE });
+      return;
+    }
     res.status(500).json({ error: "Failed to fetch class" });
   }
 }
@@ -141,7 +174,10 @@ export async function getClass(req: Request, res: Response): Promise<void> {
 export async function updateClass(req: Request, res: Response): Promise<void> {
   try {
     const id = classIdParam(req);
-    const { redirectUrl } = req.body as { redirectUrl?: string };
+    const raw = req.body as Record<string, unknown>;
+    const { redirectUrl } = raw as { redirectUrl?: string | null };
+    const requireCamera = optionalBoolField(raw, "requireCamera");
+    const requireMic = optionalBoolField(raw, "requireMic");
 
     const cls = await prisma.class.findUnique({ where: { id } });
 
@@ -154,19 +190,47 @@ export async function updateClass(req: Request, res: Response): Promise<void> {
       return;
     }
 
+    const data: {
+      redirectUrl?: string | null;
+      requireCamera?: boolean;
+      requireMic?: boolean;
+    } = {};
+    if (redirectUrl !== undefined) {
+      data.redirectUrl = typeof redirectUrl === "string" ? redirectUrl.trim() || null : null;
+    }
+    if (typeof requireCamera === "boolean") data.requireCamera = requireCamera;
+    if (typeof requireMic === "boolean") data.requireMic = requireMic;
+
+    if (Object.keys(data).length === 0) {
+      res.status(400).json({ error: "No updatable fields provided" });
+      return;
+    }
+
     const updated = await prisma.class.update({
       where: { id },
-      data: { redirectUrl: redirectUrl?.trim() || null },
-      select: { id: true, name: true, redirectUrl: true },
+      data,
+      select: {
+        id: true,
+        name: true,
+        redirectUrl: true,
+        requireCamera: true,
+        requireMic: true,
+      },
     });
 
     res.json({
       id: updated.id,
       name: updated.name,
       redirectUrl: updated.redirectUrl ?? undefined,
+      requireCamera: updated.requireCamera,
+      requireMic: updated.requireMic,
     });
   } catch (err) {
     console.error("Update class error:", err);
+    if (isPrismaMissingColumnError(err)) {
+      res.status(503).json({ error: DB_SCHEMA_OUT_OF_SYNC_MESSAGE });
+      return;
+    }
     res.status(500).json({ error: "Failed to update class" });
   }
 }
@@ -298,9 +362,15 @@ export async function joinMeeting(req: Request, res: Response): Promise<void> {
       redirectUrl: cls.redirectUrl ?? undefined,
       teacherName: cls.teacher.name || cls.teacher.email,
       teacherEmail: cls.teacher.email,
+      requireCamera: cls.requireCamera,
+      requireMic: cls.requireMic,
     });
   } catch (err) {
     console.error("Join meeting error:", err);
+    if (isPrismaMissingColumnError(err)) {
+      res.status(503).json({ error: DB_SCHEMA_OUT_OF_SYNC_MESSAGE });
+      return;
+    }
     res.status(500).json({ error: "Failed to get meeting token" });
   }
 }

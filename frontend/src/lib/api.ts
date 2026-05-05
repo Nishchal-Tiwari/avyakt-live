@@ -68,6 +68,8 @@ export interface ClassResponse {
   description: string | null;
   roomName: string;
   redirectUrl?: string | null;
+  requireCamera?: boolean;
+  requireMic?: boolean;
   teacher: { id: string; email: string; name: string | null };
   createdAt: string;
 }
@@ -79,4 +81,6 @@ export interface JoinMeetingResponse {
   redirectUrl?: string;
   teacherName: string;
   teacherEmail: string;
+  requireCamera?: boolean;
+  requireMic?: boolean;
 }

@@ -1,5 +1,6 @@
-import { Routes, Route, Navigate } from "react-router-dom";
+import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { getSafeRedirectPath } from "@/lib/redirect";
 import Login from "@/pages/Login";
 import Register from "@/pages/Register";
 import Dashboard from "@/pages/Dashboard";
@@ -7,6 +8,7 @@ import Meeting from "@/pages/Meeting";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
+  const location = useLocation();
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -14,12 +16,16 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
       </div>
     );
   }
-  if (!user) return <Navigate to="/login" replace />;
+  if (!user) {
+    const from = `${location.pathname}${location.search}`;
+    return <Navigate to={`/login?redirect=${encodeURIComponent(from)}`} replace />;
+  }
   return <>{children}</>;
 }
 
 function GuestRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
+  const location = useLocation();
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -27,7 +33,11 @@ function GuestRoute({ children }: { children: React.ReactNode }) {
       </div>
     );
   }
-  if (user) return <Navigate to="/dashboard" replace />;
+  if (user) {
+    const params = new URLSearchParams(location.search);
+    const next = getSafeRedirectPath(params.get("redirect")) ?? "/dashboard";
+    return <Navigate to={next} replace />;
+  }
   return <>{children}</>;
 }
 

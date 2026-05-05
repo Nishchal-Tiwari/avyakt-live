@@ -34,6 +34,8 @@ export default function Dashboard() {
   const [createName, setCreateName] = useState("");
   const [createDescription, setCreateDescription] = useState("");
   const [createRedirectUrl, setCreateRedirectUrl] = useState("");
+  const [createRequireCamera, setCreateRequireCamera] = useState(false);
+  const [createRequireMic, setCreateRequireMic] = useState(false);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState("");
   const [inviteClassId, setInviteClassId] = useState<string | null>(null);
@@ -50,7 +52,10 @@ export default function Dashboard() {
   const [attendanceLoading, setAttendanceLoading] = useState(false);
   const [editRedirectClassId, setEditRedirectClassId] = useState<string | null>(null);
   const [editRedirectUrl, setEditRedirectUrl] = useState("");
+  const [editRequireCamera, setEditRequireCamera] = useState(false);
+  const [editRequireMic, setEditRequireMic] = useState(false);
   const [savingRedirect, setSavingRedirect] = useState(false);
+  const [copiedLinkClassId, setCopiedLinkClassId] = useState<string | null>(null);
 
   const fetchParticipants = useCallback(async (classId: string) => {
     setParticipantsLoading(true);
@@ -155,22 +160,32 @@ export default function Dashboard() {
     return s ? `${m}m ${s}s` : `${m}m`;
   }
 
-  function openEditRedirect(c: { id: string; redirectUrl?: string | null }) {
+  function openClassSettings(c: ClassResponse) {
     setEditRedirectClassId(c.id);
     setEditRedirectUrl(c.redirectUrl ?? "");
+    setEditRequireCamera(Boolean(c.requireCamera));
+    setEditRequireMic(Boolean(c.requireMic));
   }
 
-  async function saveRedirectUrl(classId: string) {
+  function closeClassSettings() {
+    setEditRedirectClassId(null);
+    setEditRedirectUrl("");
+  }
+
+  async function saveClassSettings(classId: string) {
     setSavingRedirect(true);
     setError("");
     try {
-      await api.patch(`/classes/${classId}`, { redirectUrl: editRedirectUrl.trim() || null });
-      setEditRedirectClassId(null);
-      setEditRedirectUrl("");
+      await api.patch(`/classes/${classId}`, {
+        redirectUrl: editRedirectUrl.trim() || null,
+        requireCamera: editRequireCamera,
+        requireMic: editRequireMic,
+      });
+      closeClassSettings();
       const data = await api.get<ClassesList>("/classes");
       setClasses(data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to update redirect URL");
+      setError(err instanceof Error ? err.message : "Failed to update class settings");
     } finally {
       setSavingRedirect(false);
     }
@@ -186,10 +201,14 @@ export default function Dashboard() {
         name: createName.trim(),
         description: createDescription.trim() || undefined,
         redirectUrl: createRedirectUrl.trim() || undefined,
+        requireCamera: createRequireCamera,
+        requireMic: createRequireMic,
       });
       setCreateName("");
       setCreateDescription("");
       setCreateRedirectUrl("");
+      setCreateRequireCamera(false);
+      setCreateRequireMic(false);
       const data = await api.get<ClassesList>("/classes");
       setClasses(data);
     } catch (err) {
@@ -201,6 +220,24 @@ export default function Dashboard() {
 
   function goToMeeting(classId: string) {
     navigate(`/meeting/${classId}`);
+  }
+
+  function meetingJoinUrl(classId: string) {
+    return `${window.location.origin}/meeting/${classId}`;
+  }
+
+  async function copyMeetingLink(classId: string) {
+    const url = meetingJoinUrl(classId);
+    setError("");
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopiedLinkClassId(classId);
+      window.setTimeout(() => {
+        setCopiedLinkClassId((id) => (id === classId ? null : id));
+      }, 2500);
+    } catch {
+      setError(`Could not copy automatically. Link: ${url}`);
+    }
   }
 
   async function handleInvite(e: React.FormEvent, classId: string) {
@@ -283,6 +320,33 @@ export default function Dashboard() {
                 onChange={(e) => setCreateRedirectUrl(e.target.value)}
                 className="w-full px-4 py-2.5 rounded-lg border border-stone-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none text-sm"
               />
+              <div className="rounded-xl border border-stone-100 bg-stone-50/90 p-4 space-y-3">
+                <div>
+                  <p className="text-sm font-medium text-stone-800">Student requirements</p>
+                  <p className="text-xs text-stone-500 mt-0.5">
+                    When enabled, invited students must keep camera or microphone on to use the meeting.
+                    You can change this later in class settings or during a live meeting.
+                  </p>
+                </div>
+                <label className="flex items-center gap-2.5 text-sm text-stone-700 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={createRequireCamera}
+                    onChange={(e) => setCreateRequireCamera(e.target.checked)}
+                    className="rounded border-stone-300 text-emerald-600 focus:ring-emerald-500"
+                  />
+                  Require camera for students
+                </label>
+                <label className="flex items-center gap-2.5 text-sm text-stone-700 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={createRequireMic}
+                    onChange={(e) => setCreateRequireMic(e.target.checked)}
+                    className="rounded border-stone-300 text-emerald-600 focus:ring-emerald-500"
+                  />
+                  Require microphone for students
+                </label>
+              </div>
               <button
                 type="submit"
                 disabled={creating || !createName.trim()}
@@ -323,37 +387,76 @@ export default function Dashboard() {
                       {editRedirectClassId !== c.id && (
                         <button
                           type="button"
-                          onClick={() => openEditRedirect(c)}
+                          onClick={() => openClassSettings(c)}
                           className="ml-2 text-emerald-600 hover:underline"
                         >
-                          Edit
+                          Edit settings
                         </button>
                       )}
                     </p>
+                    <p className="text-xs text-stone-500 mt-1">
+                      Students: camera{" "}
+                      <span className="text-stone-700 font-medium">
+                        {c.requireCamera ? "required" : "optional"}
+                      </span>
+                      {" · "}
+                      mic{" "}
+                      <span className="text-stone-700 font-medium">
+                        {c.requireMic ? "required" : "optional"}
+                      </span>
+                    </p>
                     {editRedirectClassId === c.id && (
-                      <div className="mt-3 flex flex-wrap gap-2 items-center">
-                        <input
-                          type="text"
-                          placeholder="e.g. /dashboard or https://example.com/thanks"
-                          value={editRedirectUrl}
-                          onChange={(e) => setEditRedirectUrl(e.target.value)}
-                          className="flex-1 min-w-[200px] px-3 py-1.5 text-sm rounded-lg border border-stone-200"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => saveRedirectUrl(c.id)}
-                          disabled={savingRedirect}
-                          className="px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-sm hover:bg-emerald-700 disabled:opacity-50"
-                        >
-                          {savingRedirect ? "Saving…" : "Save"}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => { setEditRedirectClassId(null); setEditRedirectUrl(""); }}
-                          className="px-3 py-1.5 text-sm text-stone-500 hover:text-stone-700"
-                        >
-                          Cancel
-                        </button>
+                      <div className="mt-3 rounded-xl border border-stone-200 bg-stone-50/80 p-4 space-y-3 w-full max-w-xl">
+                        <div>
+                          <label className="block text-xs font-medium text-stone-600 mb-1">
+                            Redirect when meeting ends
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="e.g. /dashboard or https://example.com/thanks"
+                            value={editRedirectUrl}
+                            onChange={(e) => setEditRedirectUrl(e.target.value)}
+                            className="w-full px-3 py-2 text-sm rounded-lg border border-stone-200 bg-white"
+                          />
+                        </div>
+                        <div>
+                          <p className="text-xs font-medium text-stone-600 mb-2">Student requirements</p>
+                          <label className="flex items-center gap-2.5 text-sm text-stone-700 cursor-pointer mb-2">
+                            <input
+                              type="checkbox"
+                              checked={editRequireCamera}
+                              onChange={(e) => setEditRequireCamera(e.target.checked)}
+                              className="rounded border-stone-300 text-emerald-600 focus:ring-emerald-500"
+                            />
+                            Require camera for students
+                          </label>
+                          <label className="flex items-center gap-2.5 text-sm text-stone-700 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={editRequireMic}
+                              onChange={(e) => setEditRequireMic(e.target.checked)}
+                              className="rounded border-stone-300 text-emerald-600 focus:ring-emerald-500"
+                            />
+                            Require microphone for students
+                          </label>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            onClick={() => saveClassSettings(c.id)}
+                            disabled={savingRedirect}
+                            className="px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700 disabled:opacity-50"
+                          >
+                            {savingRedirect ? "Saving…" : "Save settings"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={closeClassSettings}
+                            className="px-4 py-2 text-sm text-stone-600 hover:text-stone-800"
+                          >
+                            Cancel
+                          </button>
+                        </div>
                       </div>
                     )}
                     {inviteClassId === c.id && (
@@ -416,6 +519,14 @@ export default function Dashboard() {
                       }`}
                     >
                       {attendanceClassId === c.id ? "Hide attendance" : "Attendance history"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => copyMeetingLink(c.id)}
+                      title="Anyone with this link must sign in; only invited members can enter the room."
+                      className="px-4 py-2 rounded-lg border border-stone-200 text-stone-700 text-sm font-medium hover:bg-stone-50"
+                    >
+                      {copiedLinkClassId === c.id ? "Copied link" : "Copy invite link"}
                     </button>
                     <button
                       type="button"
@@ -550,13 +661,23 @@ export default function Dashboard() {
                       Teacher: {c.teacher?.email}
                     </p>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => goToMeeting(c.id)}
-                    className="px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700"
-                  >
-                    Join meeting
-                  </button>
+                  <div className="flex flex-wrap gap-2 items-center">
+                    <button
+                      type="button"
+                      onClick={() => copyMeetingLink(c.id)}
+                      title="Sign in required. Only invited members can join."
+                      className="px-4 py-2 rounded-lg border border-stone-200 text-stone-700 text-sm font-medium hover:bg-stone-50"
+                    >
+                      {copiedLinkClassId === c.id ? "Copied link" : "Copy link"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => goToMeeting(c.id)}
+                      className="px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700"
+                    >
+                      Join meeting
+                    </button>
+                  </div>
                 </div>
               ))}
               {!classes?.asTeacher?.length && !classes?.invited?.length && (

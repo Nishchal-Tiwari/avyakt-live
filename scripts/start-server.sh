@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Start the full Yoga Class platform on a server:
+# Start the full Live Meditation platform on a server:
 # - LiveKit (Docker)
 # - Backend (Node)
 # - Frontend (built and served with 'serve')
@@ -10,7 +10,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 PID_FILE="$ROOT/.server-pids"
 
-echo "=== Yoga Class Platform - Start ==="
+echo "=== Live Meditation Platform - Start ==="
 
 # 1. LiveKit
 if command -v docker >/dev/null 2>&1 && [ -f "$ROOT/livekit-server/docker-compose.yml" ]; then

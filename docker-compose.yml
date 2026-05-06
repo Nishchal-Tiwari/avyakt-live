@@ -1,4 +1,4 @@
-# Yoga Class Platform - run frontend, backend, LiveKit and Postgres with one command.
+# Live Meditation Platform - run frontend, backend, LiveKit and Postgres with one command.
 # Usage: docker compose up -d
 # App: http://localhost:80  (frontend + API at /api)
 # Set BACKEND_LIVEKIT_URL to the URL browsers use to reach LiveKit (e.g. ws://YOUR_SERVER_IP:7880).

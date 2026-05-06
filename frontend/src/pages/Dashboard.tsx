@@ -343,7 +343,7 @@ export default function Dashboard() {
       <header className="border-b border-stone-200 bg-white/80 backdrop-blur">
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-6">
-            <h1 className="text-xl font-semibold text-stone-800">Yoga Class</h1>
+            <h1 className="text-xl font-semibold text-stone-800">Live Meditation</h1>
             {isTeacher && (
               <>
                 <Link

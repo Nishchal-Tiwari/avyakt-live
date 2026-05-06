@@ -6,7 +6,7 @@ set -e
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PID_FILE="$ROOT/.server-pids"
 
-echo "=== Stopping Yoga Class Platform ==="
+echo "=== Stopping Live Meditation Platform ==="
 
 if [ -f "$PID_FILE" ]; then
   while read -r pid; do

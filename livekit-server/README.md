@@ -1,6 +1,6 @@
 # LiveKit SFU (self-hosted)
 
-Run your own LiveKit server in this folder. The yoga app backend connects to it to issue tokens and call the Room API.
+Run your own LiveKit server in this folder. The Live Meditation app backend connects to it to issue tokens and call the Room API.
 
 ## Prerequisites
 
@@ -17,7 +17,7 @@ LiveKit listens on:
 - **7881** – WebRTC TCP
 - **50000–50100/UDP** – WebRTC media
 
-## Connect the yoga app backend
+## Connect the Live Meditation app backend
 
 1. **URL:** Point to your LiveKit server:
    - Local: `ws://localhost:7880`

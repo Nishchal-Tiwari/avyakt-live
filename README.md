@@ -1,6 +1,6 @@
-# Yoga Class Meeting Platform
+# Live Meditation Meeting Platform
 
-Production-ready MVP for invite-only online yoga classes with LiveKit video, JWT auth, and attendance tracking.
+Production-ready MVP for invite-only live meditation sessions with LiveKit video, JWT auth, and attendance tracking.
 
 ## Stack
 

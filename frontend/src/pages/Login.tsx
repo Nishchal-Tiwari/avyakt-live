@@ -35,7 +35,7 @@ export default function Login() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-emerald-50 to-teal-50 px-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-stone-800 tracking-tight">Yoga Class</h1>
+          <h1 className="text-3xl font-bold text-stone-800 tracking-tight">Live Meditation</h1>
           <p className="text-stone-500 mt-1">Sign in to your account</p>
         </div>
         <form

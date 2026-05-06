@@ -1,4 +1,4 @@
-# Running the Yoga Class Platform on a Server
+# Running the Live Meditation Platform on a Server
 
 This guide covers what you need and how to run the full stack on a Linux server (e.g. Ubuntu).
 

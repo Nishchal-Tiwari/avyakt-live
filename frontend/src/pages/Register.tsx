@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { LoopingLoaderVideo } from "@/components/looping-loader-video";
+import { LOADER_SRC_MEDITATING_BRAIN } from "@/lib/loader-animations";
 import { getSafeRedirectPath } from "@/lib/redirect";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -50,7 +51,7 @@ export default function Register() {
       <div className="relative flex min-h-screen items-center justify-center px-4 py-12">
         <div className="w-full max-w-md space-y-8">
           <div className="text-center">
-            <LoopingLoaderVideo variant="hero" />
+            <LoopingLoaderVideo variant="hero" src={LOADER_SRC_MEDITATING_BRAIN} />
             <h1 className="text-3xl font-bold tracking-tight text-foreground">Live Meditation</h1>
             <p className="mt-2 text-muted-foreground">Create your account</p>
           </div>
@@ -107,7 +108,7 @@ export default function Register() {
                   <RadioGroup
                     value={role}
                     onValueChange={(v) => setRole(v as "TEACHER" | "STUDENT")}
-                    className="grid gap-3 sm:grid-cols-2"
+                    className="grid gap-3"
                   >
                     <label
                       htmlFor="role-student"
@@ -118,6 +119,7 @@ export default function Register() {
                       <RadioGroupItem value="STUDENT" id="role-student" />
                       <span className="text-sm font-medium">Student</span>
                     </label>
+                    {/* Teacher self-signup disabled for now
                     <label
                       htmlFor="role-teacher"
                       className={`flex cursor-pointer items-center gap-3 rounded-lg border p-3 transition-colors ${
@@ -127,6 +129,7 @@ export default function Register() {
                       <RadioGroupItem value="TEACHER" id="role-teacher" />
                       <span className="text-sm font-medium">Teacher</span>
                     </label>
+                    */}
                   </RadioGroup>
                 </div>
               </CardContent>

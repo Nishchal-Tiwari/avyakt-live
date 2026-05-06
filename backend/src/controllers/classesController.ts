@@ -5,7 +5,7 @@ import {
   isPrismaMissingColumnError,
 } from "../lib/prismaErrors.js";
 import { createLiveKitToken } from "../services/livekit.js";
-import { RoomServiceClient } from "livekit-server-sdk";
+import { roomService } from "../lib/livekitRoomAdmin.js";
 import { env } from "../config/env.js";
 
 function classIdParam(req: Request): string {
@@ -21,16 +21,19 @@ function optionalBoolField(body: Record<string, unknown>, key: string): boolean 
   return undefined;
 }
 
-const livekitHostRaw = env.LIVEKIT_INTERNAL_URL || env.LIVEKIT_URL;
-const livekitHost =
-  livekitHostRaw.replace(/^wss:\/\//, "https://").replace(/^ws:\/\//, "http://") ||
-  livekitHostRaw;
+function optionalIntField(body: Record<string, unknown>, key: string): number | undefined {
+  const v = body[key];
+  if (typeof v === "number" && Number.isFinite(v)) return Math.round(v);
+  if (typeof v === "string" && v.trim() !== "") {
+    const n = Number(v);
+    if (Number.isFinite(n)) return Math.round(n);
+  }
+  return undefined;
+}
 
-const roomService = new RoomServiceClient(
-  livekitHost,
-  env.LIVEKIT_API_KEY,
-  env.LIVEKIT_API_SECRET
-);
+function clampStreakTargetDays(n: number): number {
+  return Math.min(365, Math.max(1, n));
+}
 
 export async function listClasses(req: Request, res: Response): Promise<void> {
   try {
@@ -79,6 +82,10 @@ export async function createClass(req: Request, res: Response): Promise<void> {
     };
     const requireCamera = optionalBoolField(raw, "requireCamera") ?? false;
     const requireMic = optionalBoolField(raw, "requireMic") ?? false;
+    const streakEnabled = optionalBoolField(raw, "streakEnabled") ?? false;
+    const streakTargetDays = clampStreakTargetDays(
+      optionalIntField(raw, "streakTargetDays") ?? 21,
+    );
 
     if (!name?.trim()) {
       res.status(400).json({ error: "Class name is required" });
@@ -97,6 +104,8 @@ export async function createClass(req: Request, res: Response): Promise<void> {
         redirectUrl: redirect,
         requireCamera,
         requireMic,
+        streakEnabled,
+        streakTargetDays,
       },
       include: { teacher: { select: { email: true, name: true } } },
     });
@@ -109,6 +118,8 @@ export async function createClass(req: Request, res: Response): Promise<void> {
       redirectUrl: cls.redirectUrl,
       requireCamera: cls.requireCamera,
       requireMic: cls.requireMic,
+      streakEnabled: cls.streakEnabled,
+      streakTargetDays: cls.streakTargetDays,
       teacher: cls.teacher,
       createdAt: cls.createdAt,
     });
@@ -157,6 +168,8 @@ export async function getClass(req: Request, res: Response): Promise<void> {
       redirectUrl: cls.redirectUrl ?? undefined,
       requireCamera: cls.requireCamera,
       requireMic: cls.requireMic,
+      streakEnabled: cls.streakEnabled,
+      streakTargetDays: cls.streakTargetDays,
       teacher: cls.teacher,
       invites: cls.invites,
       createdAt: cls.createdAt,
@@ -178,6 +191,8 @@ export async function updateClass(req: Request, res: Response): Promise<void> {
     const { redirectUrl } = raw as { redirectUrl?: string | null };
     const requireCamera = optionalBoolField(raw, "requireCamera");
     const requireMic = optionalBoolField(raw, "requireMic");
+    const streakEnabled = optionalBoolField(raw, "streakEnabled");
+    const streakTargetDaysRaw = optionalIntField(raw, "streakTargetDays");
 
     const cls = await prisma.class.findUnique({ where: { id } });
 
@@ -194,12 +209,18 @@ export async function updateClass(req: Request, res: Response): Promise<void> {
       redirectUrl?: string | null;
       requireCamera?: boolean;
       requireMic?: boolean;
+      streakEnabled?: boolean;
+      streakTargetDays?: number;
     } = {};
     if (redirectUrl !== undefined) {
       data.redirectUrl = typeof redirectUrl === "string" ? redirectUrl.trim() || null : null;
     }
     if (typeof requireCamera === "boolean") data.requireCamera = requireCamera;
     if (typeof requireMic === "boolean") data.requireMic = requireMic;
+    if (typeof streakEnabled === "boolean") data.streakEnabled = streakEnabled;
+    if (streakTargetDaysRaw !== undefined) {
+      data.streakTargetDays = clampStreakTargetDays(streakTargetDaysRaw);
+    }
 
     if (Object.keys(data).length === 0) {
       res.status(400).json({ error: "No updatable fields provided" });
@@ -215,6 +236,8 @@ export async function updateClass(req: Request, res: Response): Promise<void> {
         redirectUrl: true,
         requireCamera: true,
         requireMic: true,
+        streakEnabled: true,
+        streakTargetDays: true,
       },
     });
 
@@ -224,6 +247,8 @@ export async function updateClass(req: Request, res: Response): Promise<void> {
       redirectUrl: updated.redirectUrl ?? undefined,
       requireCamera: updated.requireCamera,
       requireMic: updated.requireMic,
+      streakEnabled: updated.streakEnabled,
+      streakTargetDays: updated.streakTargetDays,
     });
   } catch (err) {
     console.error("Update class error:", err);
@@ -364,6 +389,8 @@ export async function joinMeeting(req: Request, res: Response): Promise<void> {
       teacherEmail: cls.teacher.email,
       requireCamera: cls.requireCamera,
       requireMic: cls.requireMic,
+      streakEnabled: cls.streakEnabled,
+      streakTargetDays: cls.streakTargetDays,
     });
   } catch (err) {
     console.error("Join meeting error:", err);
@@ -419,6 +446,42 @@ export async function listAttendance(req: Request, res: Response): Promise<void>
       select: { id: true, email: true, joinTime: true, leaveTime: true, duration: true },
     });
 
+    let dailyRows: Array<{ email: string; day: Date; seconds: number }> = [];
+    try {
+      dailyRows = await prisma.classAttendanceDaily.findMany({
+        where: { classId: id },
+        orderBy: [{ email: "asc" }, { day: "asc" }],
+      });
+    } catch (e) {
+      console.warn(
+        "listAttendance: ClassAttendanceDaily unavailable — run `npx prisma db push` in backend:",
+        e,
+      );
+    }
+
+    const creditedDaily = dailyRows.map((r) => ({
+      email: r.email,
+      day: r.day.toISOString().slice(0, 10),
+      minutes: Math.round(r.seconds / 60),
+      seconds: r.seconds,
+    }));
+
+    const totalsMap = new Map<string, { totalSeconds: number; days: Set<string> }>();
+    for (const r of dailyRows) {
+      const t = totalsMap.get(r.email) ?? { totalSeconds: 0, days: new Set<string>() };
+      t.totalSeconds += r.seconds;
+      t.days.add(r.day.toISOString().slice(0, 10));
+      totalsMap.set(r.email, t);
+    }
+    const creditedTotals = [...totalsMap.entries()]
+      .map(([email, t]) => ({
+        email,
+        totalSeconds: t.totalSeconds,
+        totalMinutes: Math.round(t.totalSeconds / 60),
+        daysAttended: t.days.size,
+      }))
+      .sort((a, b) => a.email.localeCompare(b.email));
+
     res.json({
       attendance: records.map((r) => ({
         id: r.id,
@@ -427,6 +490,8 @@ export async function listAttendance(req: Request, res: Response): Promise<void>
         leaveTime: r.leaveTime,
         duration: r.duration,
       })),
+      creditedDaily,
+      creditedTotals,
     });
   } catch (err) {
     console.error("List attendance error:", err);

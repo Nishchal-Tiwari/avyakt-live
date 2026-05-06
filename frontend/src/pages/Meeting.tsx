@@ -16,12 +16,14 @@ import {
   useChat,
   useLayoutContext,
   usePinnedTracks,
+  useConnectionState,
 } from "@livekit/components-react";
 import type { TrackReferenceOrPlaceholder } from "@livekit/components-react";
 import { isTrackReferencePinned } from "@livekit/components-core";
 import {
   Track,
   RoomEvent,
+  ConnectionState,
   type ScreenShareCaptureOptions,
   type Participant,
 } from "livekit-client";
@@ -613,6 +615,96 @@ function MeetingPolicySync({
   return null;
 }
 
+/** Credits attendance only while LiveKit reports both host and student in the room (server-verified on tick). */
+function StudentAttendanceTick({ classId, isTeacher }: { classId: string; isTeacher: boolean }) {
+  const room = useRoomContext();
+  const connectionState = useConnectionState(room);
+
+  useEffect(() => {
+    if (isTeacher || !classId) return;
+    if (connectionState !== ConnectionState.Connected) return;
+
+    function tick() {
+      api.post("/attendance/tick", { classId }).catch(() => {});
+    }
+
+    const initial = window.setTimeout(tick, 4000);
+    const interval = window.setInterval(tick, 30000);
+    return () => {
+      window.clearTimeout(initial);
+      window.clearInterval(interval);
+    };
+  }, [isTeacher, classId, connectionState]);
+
+  return null;
+}
+
+type ClassStreakApiResponse =
+  | { streakEnabled: false; classId: string; className: string }
+  | {
+      streakEnabled: true;
+      classId: string;
+      className: string;
+      targetDays: number;
+      minMinutesRequired: number;
+      currentStreakClassDays: number;
+      daysRemaining: number;
+      goalMet: boolean;
+      headline: string;
+      detail: string;
+    };
+
+function StudentStreakBanner({
+  classId,
+  streakEnabledForClass,
+}: {
+  classId: string;
+  streakEnabledForClass: boolean;
+}) {
+  const [data, setData] = useState<ClassStreakApiResponse | null>(null);
+
+  useEffect(() => {
+    if (!streakEnabledForClass || !classId) {
+      setData(null);
+      return;
+    }
+    let cancelled = false;
+    function load() {
+      api
+        .get<ClassStreakApiResponse>(`/attendance/streak?classId=${encodeURIComponent(classId)}`)
+        .then((r) => {
+          if (!cancelled) setData(r);
+        })
+        .catch(() => {
+          if (!cancelled) setData(null);
+        });
+    }
+    load();
+    const id = window.setInterval(load, 90000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, [classId, streakEnabledForClass]);
+
+  if (!streakEnabledForClass || !data || !data.streakEnabled) return null;
+
+  return (
+    <div className="meet-streak-banner" title={data.detail}>
+      <span className="meet-streak-banner__badge">
+        {data.currentStreakClassDays}/{data.targetDays}
+      </span>
+      <p className="meet-streak-banner__text">
+        <strong>{data.headline}</strong>
+        {" · "}
+        {data.goalMet
+          ? "You have finished this streak goal — keep joining live classes to extend your run."
+          : `${data.daysRemaining} qualifying class ${data.daysRemaining === 1 ? "day" : "days"} left to complete your ${data.targetDays}-day streak (${data.minMinutesRequired}+ min with your teacher each class day).`}
+      </p>
+    </div>
+  );
+}
+
 /**
  * Students only: host can require camera and/or mic. Until they accept, local A/V stays off
  * and meeting content (remote A/V) is hidden. Accept → enable only what’s required. Decline → disconnect.
@@ -904,6 +996,7 @@ function MeetingInner({
   teacherEmail,
   initialRequireCamera,
   initialRequireMic,
+  streakEnabledForClass,
 }: {
   classId: string;
   isTeacher: boolean;
@@ -911,6 +1004,7 @@ function MeetingInner({
   teacherEmail: string;
   initialRequireCamera: boolean;
   initialRequireMic: boolean;
+  streakEnabledForClass: boolean;
 }) {
   const room = useRoomContext();
   const participants = useParticipants();
@@ -989,6 +1083,10 @@ function MeetingInner({
         requireMic={requireMic}
         teacherName={teacherName}
       >
+        <StudentAttendanceTick classId={classId} isTeacher={isTeacher} />
+        {!isTeacher && (
+          <StudentStreakBanner classId={classId} streakEnabledForClass={streakEnabledForClass} />
+        )}
         <RoomAudioRenderer />
         <RoomChatBootstrap />
 
@@ -1171,6 +1269,7 @@ export default function Meeting() {
             teacherEmail={tokenData.teacherEmail || ""}
             initialRequireCamera={Boolean(tokenData.requireCamera)}
             initialRequireMic={Boolean(tokenData.requireMic)}
+            streakEnabledForClass={Boolean(tokenData.streakEnabled)}
           />
         </LayoutContextProvider>
       </LiveKitRoom>

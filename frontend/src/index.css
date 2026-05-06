@@ -122,6 +122,41 @@ body {
   cursor: pointer;
 }
 
+.meet-streak-banner {
+  flex-shrink: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 10px 16px;
+  background: rgba(52, 168, 83, 0.14);
+  border-bottom: 1px solid rgba(52, 168, 83, 0.28);
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  color: #e8eaed;
+}
+
+.meet-streak-banner__badge {
+  flex-shrink: 0;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(52, 168, 83, 0.35);
+  color: #81c995;
+  font-size: 0.75rem;
+}
+
+.meet-streak-banner__text {
+  margin: 0;
+  flex: 1;
+  min-width: 0;
+}
+
+.meet-streak-banner__text strong {
+  color: #81c995;
+  font-weight: 600;
+}
+
 .meet-body {
   flex: 1;
   min-height: 0;

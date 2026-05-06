@@ -70,6 +70,8 @@ export interface ClassResponse {
   redirectUrl?: string | null;
   requireCamera?: boolean;
   requireMic?: boolean;
+  streakEnabled?: boolean;
+  streakTargetDays?: number;
   teacher: { id: string; email: string; name: string | null };
   createdAt: string;
 }
@@ -83,4 +85,6 @@ export interface JoinMeetingResponse {
   teacherEmail: string;
   requireCamera?: boolean;
   requireMic?: boolean;
+  streakEnabled?: boolean;
+  streakTargetDays?: number;
 }

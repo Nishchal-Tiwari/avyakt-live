@@ -39,9 +39,14 @@ model Class {
   requireCamera Boolean @default(false)
   /// When true, students must keep the microphone on to use the meeting UI.
   requireMic    Boolean @default(false)
+  /// When true, students see a host-present attendance streak for this class.
+  streakEnabled   Boolean @default(false)
+  /// Number of consecutive qualifying class days (see streak rules) to complete the goal.
+  streakTargetDays Int    @default(21)
 
-  invites    ClassInvite[]
-  attendance Attendance[]
+  invites              ClassInvite[]
+  attendance           Attendance[]
+  attendanceDaily      ClassAttendanceDaily[]
 }
 
 model ClassInvite {
@@ -67,6 +72,22 @@ model Attendance {
   leaveTime DateTime?
   duration  Int?      // seconds
 
+  @@index([classId])
+  @@index([email])
+}
+
+/// Credited seconds per student per calendar day (UTC), only while host + student are in the LiveKit room.
+model ClassAttendanceDaily {
+  id        String   @id @default(cuid())
+  classId   String
+  class     Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
+  email     String
+  day       DateTime @db.Date
+  seconds   Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([classId, email, day])
   @@index([classId])
   @@index([email])
 }

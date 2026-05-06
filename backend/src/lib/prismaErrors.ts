@@ -11,3 +11,17 @@ export function isPrismaMissingColumnError(err: unknown): boolean {
   const msg = err instanceof Error ? err.message : String(err);
   return /\bcolumn\b.*\bdoes not exist\b/i.test(msg) || /\bno such column\b/i.test(msg);
 }
+
+/** Table missing (P2021) or raw PG error when a model's table was never migrated. */
+export function isPrismaMissingRelationOrTable(err: unknown): boolean {
+  if (err instanceof Prisma.PrismaClientKnownRequestError) {
+    if (err.code === "P2021" || err.code === "P2022") return true;
+  }
+  if (isPrismaMissingColumnError(err)) return true;
+  const msg = err instanceof Error ? err.message : String(err);
+  return (
+    /\bClassAttendanceDaily\b/i.test(msg) ||
+    /\brelation\b.*\bdoes not exist\b/i.test(msg) ||
+    /\btable\b.*\bdoes not exist\b/i.test(msg)
+  );
+}

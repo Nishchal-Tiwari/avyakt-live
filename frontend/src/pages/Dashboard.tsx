@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { api, type ClassResponse } from "@/lib/api";
 
@@ -21,6 +21,29 @@ interface AttendanceRecord {
   duration: number | null;
 }
 
+interface CreditedDailyRow {
+  email: string;
+  day: string;
+  minutes: number;
+  seconds: number;
+}
+
+interface CreditedTotalRow {
+  email: string;
+  totalMinutes: number;
+  totalSeconds: number;
+  daysAttended: number;
+}
+
+interface MyAttendanceClassRow {
+  classId: string;
+  className: string;
+  daily: { day: string; minutes: number; seconds: number }[];
+  totalMinutes: number;
+  totalSeconds: number;
+  daysAttended: number;
+}
+
 interface ClassesList {
   asTeacher: (ClassResponse & { teacher?: { email: string; name: string | null } })[];
   invited: (ClassResponse & { invitedAt?: string })[];
@@ -36,6 +59,8 @@ export default function Dashboard() {
   const [createRedirectUrl, setCreateRedirectUrl] = useState("");
   const [createRequireCamera, setCreateRequireCamera] = useState(false);
   const [createRequireMic, setCreateRequireMic] = useState(false);
+  const [createStreakEnabled, setCreateStreakEnabled] = useState(false);
+  const [createStreakTargetDays, setCreateStreakTargetDays] = useState(21);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState("");
   const [inviteClassId, setInviteClassId] = useState<string | null>(null);
@@ -49,13 +74,20 @@ export default function Dashboard() {
   const [disinviting, setDisinviting] = useState<string | null>(null);
   const [attendanceClassId, setAttendanceClassId] = useState<string | null>(null);
   const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
+  const [creditedDaily, setCreditedDaily] = useState<CreditedDailyRow[]>([]);
+  const [creditedTotals, setCreditedTotals] = useState<CreditedTotalRow[]>([]);
   const [attendanceLoading, setAttendanceLoading] = useState(false);
+  const [myAttendance, setMyAttendance] = useState<MyAttendanceClassRow[]>([]);
+  const [myAttendanceLoading, setMyAttendanceLoading] = useState(false);
   const [editRedirectClassId, setEditRedirectClassId] = useState<string | null>(null);
   const [editRedirectUrl, setEditRedirectUrl] = useState("");
   const [editRequireCamera, setEditRequireCamera] = useState(false);
   const [editRequireMic, setEditRequireMic] = useState(false);
+  const [editStreakEnabled, setEditStreakEnabled] = useState(false);
+  const [editStreakTargetDays, setEditStreakTargetDays] = useState(21);
   const [savingRedirect, setSavingRedirect] = useState(false);
   const [copiedLinkClassId, setCopiedLinkClassId] = useState<string | null>(null);
+  const [studentAttendanceClassId, setStudentAttendanceClassId] = useState<string | null>(null);
 
   const fetchParticipants = useCallback(async (classId: string) => {
     setParticipantsLoading(true);
@@ -81,6 +113,16 @@ export default function Dashboard() {
       .catch(() => setError("Failed to load classes"))
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    if (user?.role === "TEACHER") return;
+    setMyAttendanceLoading(true);
+    api
+      .get<{ classes: MyAttendanceClassRow[] }>("/attendance/my")
+      .then((res) => setMyAttendance(res?.classes ?? []))
+      .catch(() => setMyAttendance([]))
+      .finally(() => setMyAttendanceLoading(false));
+  }, [user?.role]);
 
   useEffect(() => {
     if (!liveOverviewClassId) return;
@@ -123,20 +165,32 @@ export default function Dashboard() {
     }
   }
 
+  function toggleStudentAttendance(classId: string) {
+    setStudentAttendanceClassId((id) => (id === classId ? null : classId));
+  }
+
   async function toggleAttendanceHistory(classId: string) {
     if (attendanceClassId === classId) {
       setAttendanceClassId(null);
       setAttendance([]);
+      setCreditedDaily([]);
+      setCreditedTotals([]);
     } else {
       setAttendanceClassId(classId);
       setAttendanceLoading(true);
       try {
-        const res = await api.get<{ attendance: AttendanceRecord[] }>(
-          `/classes/${classId}/attendance`
-        );
+        const res = await api.get<{
+          attendance: AttendanceRecord[];
+          creditedDaily?: CreditedDailyRow[];
+          creditedTotals?: CreditedTotalRow[];
+        }>(`/classes/${classId}/attendance`);
         setAttendance(res?.attendance ?? []);
+        setCreditedDaily(res?.creditedDaily ?? []);
+        setCreditedTotals(res?.creditedTotals ?? []);
       } catch {
         setAttendance([]);
+        setCreditedDaily([]);
+        setCreditedTotals([]);
       } finally {
         setAttendanceLoading(false);
       }
@@ -160,11 +214,27 @@ export default function Dashboard() {
     return s ? `${m}m ${s}s` : `${m}m`;
   }
 
+  function myAttendanceRowForClass(classId: string): MyAttendanceClassRow | undefined {
+    return myAttendance.find((r) => r.classId === classId);
+  }
+
+  function formatCreditedSeconds(totalSeconds: number): string {
+    const m = Math.floor(totalSeconds / 60);
+    const s = totalSeconds % 60;
+    if (m === 0) return `${s}s`;
+    if (s === 0) return `${m} min`;
+    return `${m} min ${s}s`;
+  }
+
   function openClassSettings(c: ClassResponse) {
     setEditRedirectClassId(c.id);
     setEditRedirectUrl(c.redirectUrl ?? "");
     setEditRequireCamera(Boolean(c.requireCamera));
     setEditRequireMic(Boolean(c.requireMic));
+    setEditStreakEnabled(Boolean(c.streakEnabled));
+    setEditStreakTargetDays(
+      typeof c.streakTargetDays === "number" && c.streakTargetDays > 0 ? c.streakTargetDays : 21,
+    );
   }
 
   function closeClassSettings() {
@@ -180,6 +250,8 @@ export default function Dashboard() {
         redirectUrl: editRedirectUrl.trim() || null,
         requireCamera: editRequireCamera,
         requireMic: editRequireMic,
+        streakEnabled: editStreakEnabled,
+        streakTargetDays: editStreakTargetDays,
       });
       closeClassSettings();
       const data = await api.get<ClassesList>("/classes");
@@ -203,12 +275,16 @@ export default function Dashboard() {
         redirectUrl: createRedirectUrl.trim() || undefined,
         requireCamera: createRequireCamera,
         requireMic: createRequireMic,
+        streakEnabled: createStreakEnabled,
+        streakTargetDays: createStreakTargetDays,
       });
       setCreateName("");
       setCreateDescription("");
       setCreateRedirectUrl("");
       setCreateRequireCamera(false);
       setCreateRequireMic(false);
+      setCreateStreakEnabled(false);
+      setCreateStreakTargetDays(21);
       const data = await api.get<ClassesList>("/classes");
       setClasses(data);
     } catch (err) {
@@ -266,7 +342,33 @@ export default function Dashboard() {
     <div className="min-h-screen bg-gradient-to-br from-stone-50 to-emerald-50/30">
       <header className="border-b border-stone-200 bg-white/80 backdrop-blur">
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
-          <h1 className="text-xl font-semibold text-stone-800">Yoga Class</h1>
+          <div className="flex items-center gap-6">
+            <h1 className="text-xl font-semibold text-stone-800">Yoga Class</h1>
+            {isTeacher && (
+              <>
+                <Link
+                  to="/teacher/attendance"
+                  className="text-sm font-medium text-emerald-700 hover:text-emerald-900"
+                >
+                  Student attendance
+                </Link>
+                <Link
+                  to="/teacher/streaks"
+                  className="text-sm font-medium text-emerald-700 hover:text-emerald-900"
+                >
+                  Streak board
+                </Link>
+              </>
+            )}
+            {!isTeacher && (
+              <Link
+                to="/student/attendance"
+                className="text-sm font-medium text-emerald-700 hover:text-emerald-900"
+              >
+                My attendance
+              </Link>
+            )}
+          </div>
           <div className="flex items-center gap-4">
             <span className="text-sm text-stone-500">{user?.email}</span>
             <span className="text-xs px-2 py-0.5 rounded-full bg-stone-200 text-stone-700">
@@ -347,6 +449,41 @@ export default function Dashboard() {
                   Require microphone for students
                 </label>
               </div>
+              <div className="rounded-xl border border-stone-100 bg-stone-50/90 p-4 space-y-3">
+                <div>
+                  <p className="text-sm font-medium text-stone-800">Attendance streak (optional)</p>
+                  <p className="text-xs text-stone-500 mt-0.5">
+                    When enabled, students see progress toward consecutive live class days with at least 10
+                    minutes credited (teacher present). Days without a session do not break the streak.
+                  </p>
+                </div>
+                <label className="flex items-center gap-2.5 text-sm text-stone-700 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={createStreakEnabled}
+                    onChange={(e) => setCreateStreakEnabled(e.target.checked)}
+                    className="rounded border-stone-300 text-emerald-600 focus:ring-emerald-500"
+                  />
+                  Enable streak for this class
+                </label>
+                {createStreakEnabled && (
+                  <label className="flex flex-col gap-1 max-w-[200px]">
+                    <span className="text-xs font-medium text-stone-600">Class days in a row</span>
+                    <input
+                      type="number"
+                      min={1}
+                      max={365}
+                      value={createStreakTargetDays}
+                      onChange={(e) =>
+                        setCreateStreakTargetDays(
+                          Math.min(365, Math.max(1, Number(e.target.value) || 21)),
+                        )
+                      }
+                      className="px-3 py-2 text-sm rounded-lg border border-stone-200 bg-white"
+                    />
+                  </label>
+                )}
+              </div>
               <button
                 type="submit"
                 disabled={creating || !createName.trim()}
@@ -405,6 +542,16 @@ export default function Dashboard() {
                         {c.requireMic ? "required" : "optional"}
                       </span>
                     </p>
+                    <p className="text-xs text-stone-500 mt-1">
+                      Streak:{" "}
+                      {c.streakEnabled ? (
+                        <span className="text-stone-700 font-medium">
+                          {c.streakTargetDays ?? 21}-class-day goal
+                        </span>
+                      ) : (
+                        <span className="italic text-stone-400">off</span>
+                      )}
+                    </p>
                     {editRedirectClassId === c.id && (
                       <div className="mt-3 rounded-xl border border-stone-200 bg-stone-50/80 p-4 space-y-3 w-full max-w-xl">
                         <div>
@@ -439,6 +586,35 @@ export default function Dashboard() {
                             />
                             Require microphone for students
                           </label>
+                        </div>
+                        <div>
+                          <p className="text-xs font-medium text-stone-600 mb-2">Attendance streak</p>
+                          <label className="flex items-center gap-2.5 text-sm text-stone-700 cursor-pointer mb-2">
+                            <input
+                              type="checkbox"
+                              checked={editStreakEnabled}
+                              onChange={(e) => setEditStreakEnabled(e.target.checked)}
+                              className="rounded border-stone-300 text-emerald-600 focus:ring-emerald-500"
+                            />
+                            Enable streak for this class
+                          </label>
+                          {editStreakEnabled && (
+                            <label className="flex flex-col gap-1 max-w-[200px]">
+                              <span className="text-xs text-stone-600">Class days in a row</span>
+                              <input
+                                type="number"
+                                min={1}
+                                max={365}
+                                value={editStreakTargetDays}
+                                onChange={(e) =>
+                                  setEditStreakTargetDays(
+                                    Math.min(365, Math.max(1, Number(e.target.value) || 21)),
+                                  )
+                                }
+                                className="w-full px-3 py-2 text-sm rounded-lg border border-stone-200 bg-white"
+                              />
+                            </label>
+                          )}
                         </div>
                         <div className="flex flex-wrap gap-2">
                           <button
@@ -537,44 +713,126 @@ export default function Dashboard() {
                     </button>
                   </div>
                   {attendanceClassId === c.id && (
-                    <div className="w-full mt-4 pt-4 border-t border-stone-100">
-                      <h4 className="text-sm font-medium text-stone-700 mb-2">
-                        Meeting history / Attendance
-                      </h4>
-                      {attendanceLoading ? (
-                        <p className="text-sm text-stone-500">Loading…</p>
-                      ) : attendance.length === 0 ? (
-                        <p className="text-sm text-stone-500">No attendance records yet</p>
-                      ) : (
-                        <div className="overflow-x-auto rounded-lg border border-stone-200">
-                          <table className="w-full text-sm text-left">
-                            <thead className="bg-stone-100 text-stone-600">
-                              <tr>
-                                <th className="px-3 py-2 font-medium">Email</th>
-                                <th className="px-3 py-2 font-medium">Joined</th>
-                                <th className="px-3 py-2 font-medium">Left</th>
-                                <th className="px-3 py-2 font-medium">Duration</th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-stone-100">
-                              {attendance.map((r) => (
-                                <tr key={r.id} className="bg-white">
-                                  <td className="px-3 py-2 text-stone-800">{r.email}</td>
-                                  <td className="px-3 py-2 text-stone-600">
-                                    {formatTime(r.joinTime)}
-                                  </td>
-                                  <td className="px-3 py-2 text-stone-600">
-                                    {formatTime(r.leaveTime)}
-                                  </td>
-                                  <td className="px-3 py-2 text-stone-600">
-                                    {formatDuration(r.duration)}
-                                  </td>
+                    <div className="w-full mt-4 pt-4 border-t border-stone-100 space-y-6">
+                      <div>
+                        <h4 className="text-sm font-medium text-stone-800 mb-1">
+                          Attendance (host + student in meeting)
+                        </h4>
+                        <p className="text-xs text-stone-500 mb-3">
+                          Credited time is added in 30-second slices only when both you and the student are
+                          connected to the LiveKit room. Days are UTC calendar dates.
+                        </p>
+                        {attendanceLoading ? (
+                          <p className="text-sm text-stone-500">Loading…</p>
+                        ) : creditedTotals.length === 0 && creditedDaily.length === 0 ? (
+                          <p className="text-sm text-stone-500">No credited attendance yet.</p>
+                        ) : (
+                          <>
+                            {creditedTotals.length > 0 && (
+                              <div className="mb-4">
+                                <h5 className="text-xs font-semibold text-stone-600 uppercase tracking-wide mb-2">
+                                  Totals per student
+                                </h5>
+                                <div className="overflow-x-auto rounded-lg border border-stone-200">
+                                  <table className="w-full text-sm text-left">
+                                    <thead className="bg-stone-100 text-stone-600">
+                                      <tr>
+                                        <th className="px-3 py-2 font-medium">Student</th>
+                                        <th className="px-3 py-2 font-medium">Total time</th>
+                                        <th className="px-3 py-2 font-medium">Days</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-stone-100">
+                                      {creditedTotals.map((r) => (
+                                        <tr key={r.email} className="bg-white">
+                                          <td className="px-3 py-2 text-stone-800">{r.email}</td>
+                                          <td className="px-3 py-2 text-stone-600">
+                                            {formatCreditedSeconds(r.totalSeconds)}
+                                          </td>
+                                          <td className="px-3 py-2 text-stone-600">{r.daysAttended}</td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              </div>
+                            )}
+                            {creditedDaily.length > 0 && (
+                              <div>
+                                <h5 className="text-xs font-semibold text-stone-600 uppercase tracking-wide mb-2">
+                                  By day
+                                </h5>
+                                <div className="overflow-x-auto rounded-lg border border-stone-200">
+                                  <table className="w-full text-sm text-left">
+                                    <thead className="bg-stone-100 text-stone-600">
+                                      <tr>
+                                        <th className="px-3 py-2 font-medium">Student</th>
+                                        <th className="px-3 py-2 font-medium">Date (UTC)</th>
+                                        <th className="px-3 py-2 font-medium">Time that day</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-stone-100">
+                                      {creditedDaily.map((r) => (
+                                        <tr
+                                          key={`${r.email}-${r.day}`}
+                                          className="bg-white"
+                                        >
+                                          <td className="px-3 py-2 text-stone-800">{r.email}</td>
+                                          <td className="px-3 py-2 text-stone-600">{r.day}</td>
+                                          <td className="px-3 py-2 text-stone-600">
+                                            {formatCreditedSeconds(r.seconds)}
+                                          </td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </div>
+
+                      <div>
+                        <h4 className="text-sm font-medium text-stone-700 mb-2">
+                          Session log (join / leave)
+                        </h4>
+                        <p className="text-xs text-stone-500 mb-2">
+                          Raw connect/disconnect events; not gated on host presence.
+                        </p>
+                        {attendanceLoading ? null : attendance.length === 0 ? (
+                          <p className="text-sm text-stone-500">No session rows yet.</p>
+                        ) : (
+                          <div className="overflow-x-auto rounded-lg border border-stone-200">
+                            <table className="w-full text-sm text-left">
+                              <thead className="bg-stone-100 text-stone-600">
+                                <tr>
+                                  <th className="px-3 py-2 font-medium">Email</th>
+                                  <th className="px-3 py-2 font-medium">Joined</th>
+                                  <th className="px-3 py-2 font-medium">Left</th>
+                                  <th className="px-3 py-2 font-medium">Duration</th>
                                 </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      )}
+                              </thead>
+                              <tbody className="divide-y divide-stone-100">
+                                {attendance.map((r) => (
+                                  <tr key={r.id} className="bg-white">
+                                    <td className="px-3 py-2 text-stone-800">{r.email}</td>
+                                    <td className="px-3 py-2 text-stone-600">
+                                      {formatTime(r.joinTime)}
+                                    </td>
+                                    <td className="px-3 py-2 text-stone-600">
+                                      {formatTime(r.leaveTime)}
+                                    </td>
+                                    <td className="px-3 py-2 text-stone-600">
+                                      {formatDuration(r.duration)}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   )}
                   {liveOverviewClassId === c.id && (
@@ -647,39 +905,118 @@ export default function Dashboard() {
                   )}
                 </div>
               ))}
-              {classes?.invited?.map((c) => (
-                <div
-                  key={c.id}
-                  className="p-5 rounded-2xl bg-white border border-stone-100 shadow-sm flex flex-wrap items-center justify-between gap-4"
-                >
-                  <div>
-                    <h3 className="font-medium text-stone-800">{c.name}</h3>
-                    {c.description && (
-                      <p className="text-sm text-stone-500 mt-0.5">{c.description}</p>
+              {classes?.invited?.map((c) => {
+                const row = myAttendanceRowForClass(c.id);
+                const summaryLine =
+                  row && !myAttendanceLoading
+                    ? `${formatCreditedSeconds(row.totalSeconds)} · ${row.daysAttended} day${
+                        row.daysAttended === 1 ? "" : "s"
+                      } with host`
+                    : null;
+                return (
+                  <div
+                    key={c.id}
+                    className="rounded-2xl bg-white border border-stone-100 shadow-sm overflow-hidden"
+                  >
+                    <div className="p-5 flex flex-wrap items-center justify-between gap-4">
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-medium text-stone-800">{c.name}</h3>
+                        {c.description && (
+                          <p className="text-sm text-stone-500 mt-0.5">{c.description}</p>
+                        )}
+                        <p className="text-xs text-stone-400 mt-1">
+                          Teacher: {c.teacher?.email}
+                        </p>
+                        {!isTeacher && summaryLine && studentAttendanceClassId !== c.id && (
+                          <p className="text-xs text-stone-500 mt-1.5">{summaryLine}</p>
+                        )}
+                      </div>
+                      <div className="flex flex-wrap gap-2 items-center">
+                        {!isTeacher && (
+                          <button
+                            type="button"
+                            onClick={() => toggleStudentAttendance(c.id)}
+                            className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
+                              studentAttendanceClassId === c.id
+                                ? "bg-sky-100 text-sky-800 border border-sky-300"
+                                : "border border-stone-200 text-stone-700 hover:bg-stone-50"
+                            }`}
+                          >
+                            {studentAttendanceClassId === c.id ? "Hide my attendance" : "My attendance"}
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => copyMeetingLink(c.id)}
+                          title="Sign in required. Only invited members can join."
+                          className="px-4 py-2 rounded-lg border border-stone-200 text-stone-700 text-sm font-medium hover:bg-stone-50"
+                        >
+                          {copiedLinkClassId === c.id ? "Copied link" : "Copy link"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => goToMeeting(c.id)}
+                          className="px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700"
+                        >
+                          Join meeting
+                        </button>
+                      </div>
+                    </div>
+                    {!isTeacher && studentAttendanceClassId === c.id && (
+                      <div className="px-5 pb-5 pt-0 border-t border-stone-100">
+                        <p className="text-xs text-stone-500 mt-4 mb-3">
+                          Time counts only when you and the host are both in the live meeting (checked every
+                          30 seconds). Days are UTC.
+                        </p>
+                        {myAttendanceLoading ? (
+                          <p className="text-sm text-stone-500">Loading…</p>
+                        ) : !row ? (
+                          <p className="text-sm text-stone-500">
+                            No credited time yet for this class. Join while your teacher is in the meeting
+                            to build your history.
+                          </p>
+                        ) : (
+                          <>
+                            <div className="flex flex-wrap items-baseline justify-between gap-2 mb-3">
+                              <p className="text-sm text-stone-600">
+                                <span className="font-medium text-stone-800">
+                                  {formatCreditedSeconds(row.totalSeconds)}
+                                </span>
+                                <span className="text-stone-400"> · </span>
+                                {row.daysAttended} day{row.daysAttended === 1 ? "" : "s"} with host present
+                              </p>
+                            </div>
+                            {row.daily.length === 0 ? (
+                              <p className="text-sm text-stone-500">No daily breakdown yet.</p>
+                            ) : (
+                              <div className="overflow-x-auto rounded-lg border border-stone-200">
+                                <table className="w-full text-sm text-left">
+                                  <thead className="bg-stone-100 text-stone-600">
+                                    <tr>
+                                      <th className="px-3 py-2 font-medium">Date (UTC)</th>
+                                      <th className="px-3 py-2 font-medium">Time credited</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody className="divide-y divide-stone-100">
+                                    {row.daily.map((d) => (
+                                      <tr key={d.day} className="bg-white">
+                                        <td className="px-3 py-2 text-stone-800">{d.day}</td>
+                                        <td className="px-3 py-2 text-stone-600">
+                                          {formatCreditedSeconds(d.seconds)}
+                                        </td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </div>
                     )}
-                    <p className="text-xs text-stone-400 mt-1">
-                      Teacher: {c.teacher?.email}
-                    </p>
                   </div>
-                  <div className="flex flex-wrap gap-2 items-center">
-                    <button
-                      type="button"
-                      onClick={() => copyMeetingLink(c.id)}
-                      title="Sign in required. Only invited members can join."
-                      className="px-4 py-2 rounded-lg border border-stone-200 text-stone-700 text-sm font-medium hover:bg-stone-50"
-                    >
-                      {copiedLinkClassId === c.id ? "Copied link" : "Copy link"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => goToMeeting(c.id)}
-                      className="px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700"
-                    >
-                      Join meeting
-                    </button>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
               {!classes?.asTeacher?.length && !classes?.invited?.length && (
                 <p className="text-stone-500 py-8">
                   {isTeacher

@@ -1,7 +1,15 @@
 import { useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Sparkles } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { getSafeRedirectPath } from "@/lib/redirect";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { ModeToggle } from "@/components/mode-toggle";
 
 export default function Register() {
   const [email, setEmail] = useState("");
@@ -34,108 +42,110 @@ export default function Register() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-emerald-50 to-teal-50 px-4 py-12">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-stone-800 tracking-tight">Live Meditation</h1>
-          <p className="text-stone-500 mt-1">Create your account</p>
-        </div>
-        <form
-          onSubmit={handleSubmit}
-          className="bg-white rounded-2xl shadow-lg shadow-stone-200/50 border border-stone-100 p-8"
-        >
-          {error && (
-            <div className="mb-4 p-3 rounded-lg bg-red-50 text-red-700 text-sm">
-              {error}
+    <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-background via-background to-primary/[0.07] dark:to-primary/15">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,hsl(var(--primary)/0.12),transparent)] dark:bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,hsl(var(--primary)/0.18),transparent)]" />
+      <div className="absolute right-4 top-4 z-10 flex gap-2">
+        <ModeToggle />
+      </div>
+      <div className="relative flex min-h-screen items-center justify-center px-4 py-12">
+        <div className="w-full max-w-md space-y-8">
+          <div className="text-center">
+            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary shadow-sm ring-1 ring-primary/20">
+              <Sparkles className="h-7 w-7" aria-hidden />
             </div>
-          )}
-          <div className="space-y-4">
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-stone-700 mb-1">
-                Email
-              </label>
-              <input
-                id="email"
-                type="email"
-                autoComplete="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-4 py-2.5 rounded-lg border border-stone-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none transition"
-                required
-              />
-            </div>
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-stone-700 mb-1">
-                Password
-              </label>
-              <input
-                id="password"
-                type="password"
-                autoComplete="new-password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-4 py-2.5 rounded-lg border border-stone-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none transition"
-                required
-                minLength={6}
-              />
-            </div>
-            <div>
-              <label htmlFor="name" className="block text-sm font-medium text-stone-700 mb-1">
-                Name (optional)
-              </label>
-              <input
-                id="name"
-                type="text"
-                autoComplete="name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="w-full px-4 py-2.5 rounded-lg border border-stone-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none transition"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-stone-700 mb-2">
-                I am a
-              </label>
-              <div className="flex gap-4">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="role"
-                    value="STUDENT"
-                    checked={role === "STUDENT"}
-                    onChange={() => setRole("STUDENT")}
-                    className="text-emerald-600 focus:ring-emerald-500"
-                  />
-                  <span className="text-stone-700">Student</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="role"
-                    value="TEACHER"
-                    checked={role === "TEACHER"}
-                    onChange={() => setRole("TEACHER")}
-                    className="text-emerald-600 focus:ring-emerald-500"
-                  />
-                  <span className="text-stone-700">Teacher</span>
-                </label>
-              </div>
-            </div>
+            <h1 className="text-3xl font-bold tracking-tight text-foreground">Live Meditation</h1>
+            <p className="mt-2 text-muted-foreground">Create your account</p>
           </div>
-          <button
-            type="submit"
-            disabled={submitting}
-            className="mt-6 w-full py-3 rounded-lg bg-emerald-600 text-white font-medium hover:bg-emerald-700 focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 disabled:opacity-50 transition"
-          >
-            {submitting ? "Creating account..." : "Create account"}
-          </button>
-          <p className="mt-6 text-center text-sm text-stone-500">
-            Already have an account?{" "}
-            <Link to={loginHref} className="text-emerald-600 font-medium hover:underline">
-              Sign in
-            </Link>
-          </p>
-        </form>
+
+          <Card className="border-border/80 shadow-lg shadow-primary/5">
+            <CardHeader className="space-y-1 pb-4">
+              <CardTitle className="text-xl">Get started</CardTitle>
+              <CardDescription>Teachers create classes; students join invited sessions</CardDescription>
+            </CardHeader>
+            <form onSubmit={handleSubmit}>
+              <CardContent className="space-y-4">
+                {error && (
+                  <Alert variant="destructive">
+                    <AlertDescription>{error}</AlertDescription>
+                  </Alert>
+                )}
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    autoComplete="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="you@example.com"
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="password">Password</Label>
+                  <Input
+                    id="password"
+                    type="password"
+                    autoComplete="new-password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    minLength={6}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="name">Name (optional)</Label>
+                  <Input
+                    id="name"
+                    type="text"
+                    autoComplete="name"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="Display name"
+                  />
+                </div>
+                <div className="space-y-3 rounded-lg border bg-muted/30 p-4">
+                  <Label>I am a</Label>
+                  <RadioGroup
+                    value={role}
+                    onValueChange={(v) => setRole(v as "TEACHER" | "STUDENT")}
+                    className="grid gap-3 sm:grid-cols-2"
+                  >
+                    <label
+                      htmlFor="role-student"
+                      className={`flex cursor-pointer items-center gap-3 rounded-lg border p-3 transition-colors ${
+                        role === "STUDENT" ? "border-primary bg-primary/5" : "border-border hover:bg-muted/50"
+                      }`}
+                    >
+                      <RadioGroupItem value="STUDENT" id="role-student" />
+                      <span className="text-sm font-medium">Student</span>
+                    </label>
+                    <label
+                      htmlFor="role-teacher"
+                      className={`flex cursor-pointer items-center gap-3 rounded-lg border p-3 transition-colors ${
+                        role === "TEACHER" ? "border-primary bg-primary/5" : "border-border hover:bg-muted/50"
+                      }`}
+                    >
+                      <RadioGroupItem value="TEACHER" id="role-teacher" />
+                      <span className="text-sm font-medium">Teacher</span>
+                    </label>
+                  </RadioGroup>
+                </div>
+              </CardContent>
+              <CardFooter className="flex flex-col gap-4 pt-2">
+                <Button type="submit" className="w-full" disabled={submitting}>
+                  {submitting ? "Creating account…" : "Create account"}
+                </Button>
+                <p className="text-center text-sm text-muted-foreground">
+                  Already have an account?{" "}
+                  <Link to={loginHref} className="font-medium text-primary hover:underline">
+                    Sign in
+                  </Link>
+                </p>
+              </CardFooter>
+            </form>
+          </Card>
+        </div>
       </div>
     </div>
   );

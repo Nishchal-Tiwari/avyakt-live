@@ -85,6 +85,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setLoading(false);
   }, [token]);
 
+  useEffect(() => {
+    function onSessionExpired() {
+      logout();
+    }
+    window.addEventListener("auth:session-expired", onSessionExpired);
+    return () => window.removeEventListener("auth:session-expired", onSessionExpired);
+  }, [logout]);
+
   const value = useMemo<AuthContextValue>(
     () => ({ user, token, loading, login, register, logout }),
     [user, token, loading, login, register, logout]

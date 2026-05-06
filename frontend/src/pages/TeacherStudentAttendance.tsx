@@ -2,6 +2,19 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, Navigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { api } from "@/lib/api";
+import { ModeToggle } from "@/components/mode-toggle";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { cn } from "@/lib/utils";
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
 
@@ -195,113 +208,110 @@ export default function TeacherStudentAttendance() {
   const todayKey = utcTodayKey();
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-stone-50 to-emerald-50/30">
-      <header className="border-b border-stone-200 bg-white/80 backdrop-blur">
-        <div className="max-w-5xl mx-auto px-4 py-4 flex flex-wrap items-center justify-between gap-3">
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/[0.06] dark:to-primary/10">
+      <header className="sticky top-0 z-20 border-b border-border/80 bg-background/80 backdrop-blur-md">
+        <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3 px-4 py-4">
           <div className="flex items-center gap-4">
-            <Link
-              to="/dashboard"
-              className="text-sm font-medium text-emerald-700 hover:text-emerald-900"
-            >
+            <Link to="/dashboard" className="text-sm font-medium text-primary hover:text-primary/80">
               ← Dashboard
             </Link>
-            <h1 className="text-xl font-semibold text-stone-800">Student attendance</h1>
+            <h1 className="text-xl font-semibold tracking-tight text-foreground">Student attendance</h1>
           </div>
-          <div className="flex items-center gap-4 text-sm">
-            <span className="text-stone-500">{user.email}</span>
-            <button
-              type="button"
-              onClick={logout}
-              className="text-stone-500 hover:text-stone-700"
-            >
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+            <span className="hidden text-sm text-muted-foreground sm:inline">{user.email}</span>
+            <ModeToggle />
+            <Button variant="ghost" size="sm" onClick={logout} className="text-muted-foreground">
               Log out
-            </button>
+            </Button>
           </div>
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto px-4 py-8 space-y-8">
+      <main className="mx-auto max-w-5xl space-y-8 px-4 py-8">
         {rosterError && (
-          <div className="p-4 rounded-xl bg-red-50 text-red-700 text-sm">{rosterError}</div>
+          <Alert variant="destructive">
+            <AlertDescription>{rosterError}</AlertDescription>
+          </Alert>
         )}
 
-        <section className="p-6 rounded-2xl bg-white border border-stone-100 shadow-sm space-y-4">
-          <p className="text-sm text-stone-600">
-            Pick an invited student and optionally one of your classes. Credited time is host-present
-            time (UTC days), same as in meetings.
-          </p>
-          <div className="flex flex-col lg:flex-row gap-4 flex-wrap">
-            <label className="flex flex-col gap-1.5 min-w-[220px] flex-1">
-              <span className="text-xs font-medium text-stone-600">Student</span>
-              <select
-                value={selectedEmail}
-                onChange={(e) => {
-                  const v = e.target.value;
-                  updateQuery({ email: v, classId: "all" });
-                }}
-                className="px-3 py-2.5 rounded-lg border border-stone-200 bg-white text-stone-800 text-sm focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none"
-              >
-                <option value="">Select a student…</option>
-                {(roster ?? []).map((s) => (
-                  <option key={s.email} value={s.email}>
-                    {s.email}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="flex flex-col gap-1.5 min-w-[200px] flex-1">
-              <span className="text-xs font-medium text-stone-600">Class scope</span>
-              <select
-                value={classScope === "all" || !selectedStudentMeta ? "all" : classScope}
-                onChange={(e) => {
-                  const v = e.target.value;
-                  updateQuery({ classId: v === "all" ? "all" : v });
-                }}
-                disabled={!selectedStudentMeta}
-                className="px-3 py-2.5 rounded-lg border border-stone-200 bg-white text-stone-800 text-sm focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none disabled:opacity-50"
-              >
-                <option value="all">All shared classes</option>
-                {(selectedStudentMeta?.classes ?? []).map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <div className="flex flex-col gap-1.5 min-w-[240px]">
-              <span className="text-xs font-medium text-stone-600">Month (UTC)</span>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => updateQuery({ month: shiftMonth(month, -1) })}
-                  className="px-3 py-2 rounded-lg border border-stone-200 text-stone-700 text-sm hover:bg-stone-50"
+        <Card className="border-border/80 shadow-sm">
+          <CardContent className="space-y-4 p-6">
+            <p className="text-sm text-muted-foreground">
+              Pick an invited student and optionally one of your classes. Credited time is host-present time
+              (UTC days), same as in meetings.
+            </p>
+            <div className="flex flex-col flex-wrap gap-4 lg:flex-row">
+              <div className="flex min-w-[220px] flex-1 flex-col gap-2">
+                <Label className="text-xs text-muted-foreground">Student</Label>
+                <Select
+                  value={selectedEmail || undefined}
+                  onValueChange={(v) => updateQuery({ email: v, classId: "all" })}
                 >
-                  ←
-                </button>
-                <span className="flex-1 text-center text-sm font-medium text-stone-800 tabular-nums">
-                  {month}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => updateQuery({ month: shiftMonth(month, 1) })}
-                  className="px-3 py-2 rounded-lg border border-stone-200 text-stone-700 text-sm hover:bg-stone-50"
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a student…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(roster ?? []).map((s) => (
+                      <SelectItem key={s.email} value={s.email}>
+                        {s.email}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex min-w-[200px] flex-1 flex-col gap-2">
+                <Label className="text-xs text-muted-foreground">Class scope</Label>
+                <Select
+                  value={classScope === "all" || !selectedStudentMeta ? "all" : classScope}
+                  onValueChange={(v) => updateQuery({ classId: v === "all" ? "all" : v })}
+                  disabled={!selectedStudentMeta}
                 >
-                  →
-                </button>
-                <button
-                  type="button"
-                  onClick={() => updateQuery({ month: currentMonthUtc() })}
-                  className="px-3 py-2 rounded-lg border border-emerald-200 text-emerald-800 text-sm hover:bg-emerald-50"
-                >
-                  Today
-                </button>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Class" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All shared classes</SelectItem>
+                    {(selectedStudentMeta?.classes ?? []).map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex min-w-[240px] flex-col gap-2">
+                <Label className="text-xs text-muted-foreground">Month (UTC)</Label>
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => updateQuery({ month: shiftMonth(month, -1) })}
+                  >
+                    ←
+                  </Button>
+                  <span className="flex-1 text-center text-sm font-medium tabular-nums text-foreground">
+                    {month}
+                  </span>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => updateQuery({ month: shiftMonth(month, 1) })}
+                  >
+                    →
+                  </Button>
+                  <Button type="button" variant="secondary" size="sm" onClick={() => updateQuery({ month: currentMonthUtc() })}>
+                    Today
+                  </Button>
+                </div>
               </div>
             </div>
-          </div>
-        </section>
+          </CardContent>
+        </Card>
 
         {roster && roster.length === 0 && (
-          <p className="text-stone-600 text-sm">
+          <p className="text-sm text-muted-foreground">
             No invited students yet. Invite emails from a class on the dashboard, then return here.
           </p>
         )}
@@ -309,203 +319,215 @@ export default function TeacherStudentAttendance() {
         {selectedEmail && (
           <>
             {detailError && (
-              <div className="p-4 rounded-xl bg-red-50 text-red-700 text-sm">{detailError}</div>
+              <Alert variant="destructive">
+                <AlertDescription>{detailError}</AlertDescription>
+              </Alert>
             )}
 
             {detailLoading && !detail && (
-              <p className="text-stone-500 text-sm">Loading attendance…</p>
+              <p className="text-sm text-muted-foreground">Loading attendance…</p>
             )}
-            {detailLoading && detail && (
-              <p className="text-stone-400 text-xs">Refreshing…</p>
-            )}
+            {detailLoading && detail && <p className="text-xs text-muted-foreground">Refreshing…</p>}
 
             {detail && (
               <>
-                <section className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                  <div className="p-5 rounded-2xl bg-white border border-stone-100 shadow-sm">
-                    <p className="text-xs font-medium text-stone-500 uppercase tracking-wide">
-                      Student
-                    </p>
-                    <p className="mt-1 font-medium text-stone-900 break-all">{detail.email}</p>
-                    {detail.studentName && (
-                      <p className="text-sm text-stone-600 mt-0.5">{detail.studentName}</p>
-                    )}
-                  </div>
-                  <div className="p-5 rounded-2xl bg-white border border-stone-100 shadow-sm">
-                    <p className="text-xs font-medium text-stone-500 uppercase tracking-wide">
-                      This month (UTC)
-                    </p>
-                    <p className="mt-1 text-lg font-semibold text-stone-900">
-                      {formatCreditedSeconds(detail.monthTotals.seconds)}
-                    </p>
-                    <p className="text-sm text-stone-600">
-                      {detail.monthTotals.daysWithActivity} active day
-                      {detail.monthTotals.daysWithActivity === 1 ? "" : "s"}
-                    </p>
-                  </div>
-                  <div className="p-5 rounded-2xl bg-white border border-stone-100 shadow-sm">
-                    <p className="text-xs font-medium text-stone-500 uppercase tracking-wide">
-                      All time (scope)
-                    </p>
-                    <p className="mt-1 text-lg font-semibold text-stone-900">
-                      {formatCreditedSeconds(detail.overallTotals.totalSeconds)}
-                    </p>
-                    <p className="text-sm text-stone-600">
-                      {detail.overallTotals.distinctDays} distinct day
-                      {detail.overallTotals.distinctDays === 1 ? "" : "s"}
-                    </p>
-                  </div>
-                  <div className="p-5 rounded-2xl bg-white border border-stone-100 shadow-sm">
-                    <p className="text-xs font-medium text-stone-500 uppercase tracking-wide">
-                      Scope
-                    </p>
-                    <p className="mt-1 text-sm font-medium text-stone-900">
-                      {detail.classScope === "all"
-                        ? "All shared classes"
-                        : detail.byClass.find((c) => c.classId === detail.classScope)?.className ??
-                          "One class"}
-                    </p>
-                    {detail.streakSummaries && detail.streakSummaries.length > 0 && (
-                      <div className="mt-3 pt-3 border-t border-stone-100 space-y-2">
-                        <p className="text-xs font-medium text-stone-600 uppercase tracking-wide">
-                          Streak (live class days)
-                        </p>
-                        {detail.streakSummaries.map((s) => (
-                          <p key={s.classId} className="text-xs text-stone-600 leading-relaxed">
-                            <span className="font-medium text-stone-800">{s.className}:</span>{" "}
-                            <span className="tabular-nums font-semibold text-stone-900">
-                              {s.currentStreakClassDays}
-                            </span>
-                            <span className="text-stone-500">
-                              {" "}
-                              / {s.targetDays} day{s.targetDays === 1 ? "" : "s"} built
-                            </span>
-                            {s.goalMet ? (
-                              <span className="text-emerald-700 font-medium"> — goal complete</span>
-                            ) : (
-                              <span className="text-stone-500">
+                <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                  <Card className="border-border/80 shadow-sm">
+                    <CardContent className="p-5">
+                      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                        Student
+                      </p>
+                      <p className="mt-1 break-all font-medium text-foreground">{detail.email}</p>
+                      {detail.studentName && (
+                        <p className="mt-0.5 text-sm text-muted-foreground">{detail.studentName}</p>
+                      )}
+                    </CardContent>
+                  </Card>
+                  <Card className="border-border/80 shadow-sm">
+                    <CardContent className="p-5">
+                      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                        This month (UTC)
+                      </p>
+                      <p className="mt-1 text-lg font-semibold text-foreground">
+                        {formatCreditedSeconds(detail.monthTotals.seconds)}
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        {detail.monthTotals.daysWithActivity} active day
+                        {detail.monthTotals.daysWithActivity === 1 ? "" : "s"}
+                      </p>
+                    </CardContent>
+                  </Card>
+                  <Card className="border-border/80 shadow-sm">
+                    <CardContent className="p-5">
+                      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                        All time (scope)
+                      </p>
+                      <p className="mt-1 text-lg font-semibold text-foreground">
+                        {formatCreditedSeconds(detail.overallTotals.totalSeconds)}
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        {detail.overallTotals.distinctDays} distinct day
+                        {detail.overallTotals.distinctDays === 1 ? "" : "s"}
+                      </p>
+                    </CardContent>
+                  </Card>
+                  <Card className="border-border/80 shadow-sm">
+                    <CardContent className="p-5">
+                      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                        Scope
+                      </p>
+                      <p className="mt-1 text-sm font-medium text-foreground">
+                        {detail.classScope === "all"
+                          ? "All shared classes"
+                          : detail.byClass.find((c) => c.classId === detail.classScope)?.className ??
+                            "One class"}
+                      </p>
+                      {detail.streakSummaries && detail.streakSummaries.length > 0 && (
+                        <div className="mt-3 space-y-2 border-t border-border pt-3">
+                          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                            Streak (live class days)
+                          </p>
+                          {detail.streakSummaries.map((s) => (
+                            <p key={s.classId} className="text-xs leading-relaxed text-muted-foreground">
+                              <span className="font-medium text-foreground">{s.className}:</span>{" "}
+                              <span className="font-semibold tabular-nums text-foreground">
+                                {s.currentStreakClassDays}
+                              </span>
+                              <span>
                                 {" "}
-                                ({s.daysRemaining} more class day
-                                {s.daysRemaining === 1 ? "" : "s"} to goal)
+                                / {s.targetDays} day{s.targetDays === 1 ? "" : "s"} built
+                              </span>
+                              {s.goalMet ? (
+                                <span className="font-medium text-primary"> — goal complete</span>
+                              ) : (
+                                <span>
+                                  {" "}
+                                  ({s.daysRemaining} more class day
+                                  {s.daysRemaining === 1 ? "" : "s"} to goal)
+                                </span>
+                              )}
+                            </p>
+                          ))}
+                        </div>
+                      )}
+                      {detail.overallTotals.firstDay && (
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          First record {detail.overallTotals.firstDay}
+                          {detail.overallTotals.lastDay &&
+                            detail.overallTotals.lastDay !== detail.overallTotals.firstDay &&
+                            ` → ${detail.overallTotals.lastDay}`}
+                        </p>
+                      )}
+                    </CardContent>
+                  </Card>
+                </section>
+
+                <Card className="border-border/80 shadow-sm">
+                  <CardContent className="space-y-4 p-6">
+                    <h2 className="text-sm font-semibold text-foreground">Per class</h2>
+                    {detail.byClass.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">No credited rows in this scope.</p>
+                    ) : (
+                      <div className="overflow-x-auto rounded-lg border border-border">
+                        <table className="w-full text-left text-sm">
+                          <thead className="bg-muted/50 text-muted-foreground">
+                            <tr>
+                              <th className="px-3 py-2 font-medium">Class</th>
+                              <th className="px-3 py-2 font-medium">This month</th>
+                              <th className="px-3 py-2 font-medium">Days (month)</th>
+                              <th className="px-3 py-2 font-medium">All time</th>
+                              <th className="px-3 py-2 font-medium">Days (all)</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-border">
+                            {detail.byClass.map((c) => (
+                              <tr key={c.classId} className="bg-card">
+                                <td className="px-3 py-2 text-foreground">{c.className}</td>
+                                <td className="px-3 py-2 text-muted-foreground">
+                                  {formatCreditedSeconds(c.secondsInMonth)}
+                                </td>
+                                <td className="px-3 py-2 text-muted-foreground">{c.daysInMonth}</td>
+                                <td className="px-3 py-2 text-muted-foreground">
+                                  {formatCreditedSeconds(c.secondsAllTime)}
+                                </td>
+                                <td className="px-3 py-2 text-muted-foreground">{c.daysAllTime}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                <Card className="border-border/80 shadow-sm">
+                  <CardContent className="space-y-4 p-6">
+                    <div className="flex flex-wrap items-baseline justify-between gap-2">
+                      <h2 className="text-sm font-semibold text-foreground">
+                        Calendar — {detail.month} (UTC)
+                      </h2>
+                      <p className="text-xs text-muted-foreground">
+                        Darker = more credited time that day. Hover a day for split by class.
+                      </p>
+                    </div>
+                    <div className="mb-2 grid grid-cols-7 gap-1.5 text-center text-xs text-muted-foreground">
+                      {WEEKDAYS.map((d) => (
+                        <div key={d} className="py-1 font-medium">
+                          {d}
+                        </div>
+                      ))}
+                    </div>
+                    <div className="grid grid-cols-7 gap-1.5">
+                      {Array.from({ length: leadingBlanks }).map((_, i) => (
+                        <div key={`pad-${i}`} className="aspect-square rounded-lg bg-muted/40" />
+                      ))}
+                      {detail.calendarDays.map((cell) => {
+                        const intensity =
+                          maxSecondsInMonth > 0 && cell.seconds > 0
+                            ? Math.max(0.2, cell.seconds / maxSecondsInMonth)
+                            : 0;
+                        const dayNum = Number(cell.day.slice(8, 10));
+                        const isToday = cell.day === todayKey;
+                        const title =
+                          cell.seconds === 0
+                            ? `${cell.day}: no credit`
+                            : `${cell.day}: ${formatCreditedSeconds(cell.seconds)}` +
+                              (cell.byClass.length
+                                ? `\n${cell.byClass.map((b) => `${b.className}: ${formatCreditedSeconds(b.seconds)}`).join("\n")}`
+                                : "");
+                        return (
+                          <div
+                            key={cell.day}
+                            title={title}
+                            className={cn(
+                              "flex aspect-square flex-col items-center justify-center rounded-lg border text-[11px] transition sm:text-xs",
+                              isToday
+                                ? "border-primary ring-2 ring-primary ring-offset-1 ring-offset-background"
+                                : "border-border",
+                              cell.seconds === 0
+                                ? "bg-muted/30 text-muted-foreground"
+                                : "font-medium text-foreground",
+                            )}
+                            style={
+                              cell.seconds > 0
+                                ? {
+                                    backgroundColor: `rgba(16, 185, 129, ${0.12 + intensity * 0.55})`,
+                                  }
+                                : undefined
+                            }
+                          >
+                            <span>{dayNum}</span>
+                            {cell.seconds > 0 && (
+                              <span className="mt-0.5 hidden text-[10px] leading-tight text-muted-foreground sm:block">
+                                {Math.round(cell.seconds / 60)}m
                               </span>
                             )}
-                          </p>
-                        ))}
-                      </div>
-                    )}
-                    {detail.overallTotals.firstDay && (
-                      <p className="text-xs text-stone-500 mt-1">
-                        First record {detail.overallTotals.firstDay}
-                        {detail.overallTotals.lastDay &&
-                          detail.overallTotals.lastDay !== detail.overallTotals.firstDay &&
-                          ` → ${detail.overallTotals.lastDay}`}
-                      </p>
-                    )}
-                  </div>
-                </section>
-
-                <section className="p-6 rounded-2xl bg-white border border-stone-100 shadow-sm">
-                  <h2 className="text-sm font-semibold text-stone-800 mb-4">Per class</h2>
-                  {detail.byClass.length === 0 ? (
-                    <p className="text-sm text-stone-500">No credited rows in this scope.</p>
-                  ) : (
-                    <div className="overflow-x-auto rounded-lg border border-stone-200">
-                      <table className="w-full text-sm text-left">
-                        <thead className="bg-stone-100 text-stone-600">
-                          <tr>
-                            <th className="px-3 py-2 font-medium">Class</th>
-                            <th className="px-3 py-2 font-medium">This month</th>
-                            <th className="px-3 py-2 font-medium">Days (month)</th>
-                            <th className="px-3 py-2 font-medium">All time</th>
-                            <th className="px-3 py-2 font-medium">Days (all)</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-stone-100">
-                          {detail.byClass.map((c) => (
-                            <tr key={c.classId} className="bg-white">
-                              <td className="px-3 py-2 text-stone-800">{c.className}</td>
-                              <td className="px-3 py-2 text-stone-600">
-                                {formatCreditedSeconds(c.secondsInMonth)}
-                              </td>
-                              <td className="px-3 py-2 text-stone-600">{c.daysInMonth}</td>
-                              <td className="px-3 py-2 text-stone-600">
-                                {formatCreditedSeconds(c.secondsAllTime)}
-                              </td>
-                              <td className="px-3 py-2 text-stone-600">{c.daysAllTime}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                          </div>
+                        );
+                      })}
                     </div>
-                  )}
-                </section>
-
-                <section className="p-6 rounded-2xl bg-white border border-stone-100 shadow-sm">
-                  <div className="flex flex-wrap items-baseline justify-between gap-2 mb-4">
-                    <h2 className="text-sm font-semibold text-stone-800">
-                      Calendar — {detail.month} (UTC)
-                    </h2>
-                    <p className="text-xs text-stone-500">
-                      Darker = more credited time that day. Hover a day for split by class.
-                    </p>
-                  </div>
-                  <div className="grid grid-cols-7 gap-1.5 text-center text-xs text-stone-500 mb-2">
-                    {WEEKDAYS.map((d) => (
-                      <div key={d} className="font-medium py-1">
-                        {d}
-                      </div>
-                    ))}
-                  </div>
-                  <div className="grid grid-cols-7 gap-1.5">
-                    {Array.from({ length: leadingBlanks }).map((_, i) => (
-                      <div key={`pad-${i}`} className="aspect-square rounded-lg bg-stone-50/80" />
-                    ))}
-                    {detail.calendarDays.map((cell) => {
-                      const intensity =
-                        maxSecondsInMonth > 0 && cell.seconds > 0
-                          ? Math.max(0.2, cell.seconds / maxSecondsInMonth)
-                          : 0;
-                      const dayNum = Number(cell.day.slice(8, 10));
-                      const isToday = cell.day === todayKey;
-                      const title =
-                        cell.seconds === 0
-                          ? `${cell.day}: no credit`
-                          : `${cell.day}: ${formatCreditedSeconds(cell.seconds)}` +
-                            (cell.byClass.length
-                              ? `\n${cell.byClass.map((b) => `${b.className}: ${formatCreditedSeconds(b.seconds)}`).join("\n")}`
-                              : "");
-                      return (
-                        <div
-                          key={cell.day}
-                          title={title}
-                          className={`aspect-square rounded-lg border flex flex-col items-center justify-center text-[11px] sm:text-xs transition ${
-                            isToday
-                              ? "ring-2 ring-emerald-500 ring-offset-1 border-emerald-200"
-                              : "border-stone-100"
-                          } ${
-                            cell.seconds === 0
-                              ? "bg-stone-50 text-stone-400"
-                              : "text-stone-900 font-medium"
-                          }`}
-                          style={
-                            cell.seconds > 0
-                              ? {
-                                  backgroundColor: `rgba(16, 185, 129, ${0.12 + intensity * 0.55})`,
-                                }
-                              : undefined
-                          }
-                        >
-                          <span>{dayNum}</span>
-                          {cell.seconds > 0 && (
-                            <span className="text-[10px] text-stone-600 leading-tight mt-0.5 hidden sm:block">
-                              {Math.round(cell.seconds / 60)}m
-                            </span>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </section>
+                  </CardContent>
+                </Card>
               </>
             )}
           </>

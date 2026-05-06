@@ -1,4 +1,16 @@
-const API_BASE = import.meta.env.VITE_API_BASE ?? "/api";
+/** Relative `/api` uses Vite dev proxy; absolute URL talks to backend directly (needs CORS). */
+const envApiBase = import.meta.env.VITE_API_BASE;
+const API_BASE =
+  typeof envApiBase === "string" && envApiBase.trim() !== ""
+    ? envApiBase.trim().replace(/\/$/, "")
+    : "/api";
+
+function joinApiPath(path: string): string {
+  const p = path.startsWith("/") ? path : `/${path}`;
+  return `${API_BASE}${p}`;
+}
+
+const SESSION_EVENT = "auth:session-expired";
 
 function getToken(): string | null {
   return localStorage.getItem("token");
@@ -13,6 +25,15 @@ function getHeaders(includeAuth = true): HeadersInit {
   return headers;
 }
 
+function clearSessionIfStaleRequest(sentWithAuthHeader: boolean, res: Response) {
+  if (res.status !== 401 || !sentWithAuthHeader) return;
+  const hadToken = Boolean(getToken());
+  if (!hadToken) return;
+  localStorage.removeItem("token");
+  localStorage.removeItem("user");
+  window.dispatchEvent(new CustomEvent(SESSION_EVENT));
+}
+
 async function handleResponse<T>(res: Response): Promise<T> {
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
@@ -22,28 +43,45 @@ async function handleResponse<T>(res: Response): Promise<T> {
 }
 
 export const api = {
+  /** GET /health on the backend (via /api/health when using the Vite proxy). */
+  async pingBackend(): Promise<boolean> {
+    try {
+      const res = await fetch(joinApiPath("/health"));
+      return res.ok;
+    } catch {
+      return false;
+    }
+  },
+
   async post<T>(path: string, body?: unknown, auth = true): Promise<T> {
-    const res = await fetch(`${API_BASE}${path}`, {
+    const headers = getHeaders(auth);
+    const sentWithAuthHeader = auth && Boolean(getToken());
+    const res = await fetch(joinApiPath(path), {
       method: "POST",
-      headers: getHeaders(auth),
+      headers,
       body: body !== undefined ? JSON.stringify(body) : undefined,
     });
+    clearSessionIfStaleRequest(sentWithAuthHeader, res);
     return handleResponse<T>(res);
   },
 
   async get<T>(path: string): Promise<T> {
-    const res = await fetch(`${API_BASE}${path}`, {
+    const sentWithAuthHeader = Boolean(getToken());
+    const res = await fetch(joinApiPath(path), {
       headers: getHeaders(),
     });
+    clearSessionIfStaleRequest(sentWithAuthHeader, res);
     return handleResponse<T>(res);
   },
 
   async patch<T>(path: string, body?: unknown): Promise<T> {
-    const res = await fetch(`${API_BASE}${path}`, {
+    const sentWithAuthHeader = Boolean(getToken());
+    const res = await fetch(joinApiPath(path), {
       method: "PATCH",
       headers: getHeaders(),
       body: body !== undefined ? JSON.stringify(body) : undefined,
     });
+    clearSessionIfStaleRequest(sentWithAuthHeader, res);
     return handleResponse<T>(res);
   },
 };

@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { getSafeRedirectPath } from "@/lib/redirect";
+import { Skeleton } from "@/components/ui/skeleton";
 import Login from "@/pages/Login";
 import Register from "@/pages/Register";
 import Dashboard from "@/pages/Dashboard";
@@ -14,8 +15,9 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const location = useLocation();
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-pulse text-stone-500">Loading...</div>
+      <div className="min-h-screen flex flex-col items-center justify-center gap-3 bg-background px-4">
+        <Skeleton className="h-10 w-48" />
+        <Skeleton className="h-4 w-32" />
       </div>
     );
   }
@@ -30,8 +32,9 @@ function StudentRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-pulse text-stone-500">Loading...</div>
+      <div className="min-h-screen flex flex-col items-center justify-center gap-3 bg-background px-4">
+        <Skeleton className="h-10 w-48" />
+        <Skeleton className="h-4 w-32" />
       </div>
     );
   }
@@ -48,8 +51,9 @@ function TeacherRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-pulse text-stone-500">Loading...</div>
+      <div className="min-h-screen flex flex-col items-center justify-center gap-3 bg-background px-4">
+        <Skeleton className="h-10 w-48" />
+        <Skeleton className="h-4 w-32" />
       </div>
     );
   }
@@ -67,8 +71,9 @@ function GuestRoute({ children }: { children: React.ReactNode }) {
   const location = useLocation();
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-pulse text-stone-500">Loading...</div>
+      <div className="min-h-screen flex flex-col items-center justify-center gap-3 bg-background px-4">
+        <Skeleton className="h-10 w-48" />
+        <Skeleton className="h-4 w-32" />
       </div>
     );
   }

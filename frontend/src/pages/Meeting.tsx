@@ -31,6 +31,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { api, type JoinMeetingResponse } from "@/lib/api";
 import "@livekit/components-styles";
 import Chat from "@/components/Chat";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 const MEDIA_POLICY_MSG = "mediaPolicy";
 
@@ -266,9 +267,14 @@ function ParticipantTile({
         <VideoTrack trackRef={trackRef} className="meet-tile__video" />
       ) : (
         <div className="meet-tile__avatar">
-          <div className="meet-tile__avatar-circle" style={{ backgroundColor: getAvatarColor(name) }}>
-            {getInitials(name)}
-          </div>
+          <Avatar size="tile" className="border-2 border-white/10 shadow-md">
+            <AvatarFallback
+              className="text-[clamp(1.125rem,3vw,2.25rem)] font-semibold text-white"
+              style={{ backgroundColor: getAvatarColor(name) }}
+            >
+              {getInitials(name)}
+            </AvatarFallback>
+          </Avatar>
         </div>
       )}
       {pinInteractive && isPinned && (
@@ -508,12 +514,14 @@ function ParticipantsPanel({
           const isMe = p.identity === localParticipant?.identity;
           return (
             <div key={p.identity} className="meet-panel__person">
-              <div
-                className="meet-panel__avatar"
-                style={{ backgroundColor: getAvatarColor(p.name || p.identity) }}
-              >
-                {getInitials(p.name || p.identity)}
-              </div>
+              <Avatar className="h-9 w-9 shrink-0 border border-white/15">
+                <AvatarFallback
+                  className="text-sm font-semibold text-white"
+                  style={{ backgroundColor: getAvatarColor(p.name || p.identity) }}
+                >
+                  {getInitials(p.name || p.identity)}
+                </AvatarFallback>
+              </Avatar>
               <div className="meet-panel__person-info">
                 <span className="meet-panel__person-name">
                   {p.name || p.identity}

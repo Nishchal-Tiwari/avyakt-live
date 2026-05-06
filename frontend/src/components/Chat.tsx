@@ -1,36 +1,27 @@
 import { Chat as LiveKitChat } from "@livekit/components-react";
+import { Button } from "@/components/ui/button";
+import { X } from "lucide-react";
 
 export default function Chat({ onClose }: { onClose?: () => void }) {
   return (
-    <div className="flex flex-col h-full relative" style={{ background: "#202124" }}>
-      <div
-        className="flex justify-between items-center px-5 py-4 absolute top-0 left-0 right-0 z-10 h-[56px]"
-        style={{ borderBottom: "1px solid #303134", background: "#292a2d" }}
-      >
-        <h3 className="text-[#e8eaed] font-semibold text-[15px]">Chat</h3>
+    <div className="flex h-full flex-col relative bg-[#202124] text-[#e8eaed]">
+      <div className="absolute left-0 right-0 top-0 z-10 flex h-14 items-center justify-between border-b border-[#303134] bg-[#292a2d] px-5">
+        <h3 className="text-[15px] font-semibold tracking-tight">Chat</h3>
         {onClose && (
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="icon"
             onClick={onClose}
-            className="flex items-center justify-center w-8 h-8 rounded-full transition-colors"
-            style={{ color: "#9aa0a6" }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = "#3c4043";
-              e.currentTarget.style.color = "#e8eaed";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = "transparent";
-              e.currentTarget.style.color = "#9aa0a6";
-            }}
+            className="h-9 w-9 rounded-full text-[#9aa0a6] hover:bg-[#3c4043] hover:text-[#e8eaed]"
+            aria-label="Close chat"
           >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
+            <X className="h-5 w-5" />
+          </Button>
         )}
       </div>
 
-      <div className="flex-1 mt-[56px] h-[calc(100%-56px)] custom-chat-container">
+      <div className="custom-chat-container mt-14 h-[calc(100%-3.5rem)] flex-1">
         <LiveKitChat />
       </div>
     </div>

@@ -2,6 +2,16 @@ import { useEffect, useState, useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { api, type ClassResponse } from "@/lib/api";
+import { ModeToggle } from "@/components/mode-toggle";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
 
 interface Participant {
   identity: string;
@@ -339,22 +349,22 @@ export default function Dashboard() {
   const isTeacher = user?.role === "TEACHER";
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-stone-50 to-emerald-50/30">
-      <header className="border-b border-stone-200 bg-white/80 backdrop-blur">
-        <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-6">
-            <h1 className="text-xl font-semibold text-stone-800">Live Meditation</h1>
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/[0.06] dark:to-primary/10">
+      <header className="sticky top-0 z-20 border-b border-border/80 bg-background/80 backdrop-blur-md">
+        <div className="mx-auto flex max-w-4xl flex-wrap items-center justify-between gap-3 px-4 py-4">
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+            <h1 className="text-xl font-semibold tracking-tight text-foreground">Live Meditation</h1>
             {isTeacher && (
               <>
                 <Link
                   to="/teacher/attendance"
-                  className="text-sm font-medium text-emerald-700 hover:text-emerald-900"
+                  className="text-sm font-medium text-primary hover:text-primary/80"
                 >
                   Student attendance
                 </Link>
                 <Link
                   to="/teacher/streaks"
-                  className="text-sm font-medium text-emerald-700 hover:text-emerald-900"
+                  className="text-sm font-medium text-primary hover:text-primary/80"
                 >
                   Streak board
                 </Link>
@@ -363,245 +373,260 @@ export default function Dashboard() {
             {!isTeacher && (
               <Link
                 to="/student/attendance"
-                className="text-sm font-medium text-emerald-700 hover:text-emerald-900"
+                className="text-sm font-medium text-primary hover:text-primary/80"
               >
                 My attendance
               </Link>
             )}
           </div>
-          <div className="flex items-center gap-4">
-            <span className="text-sm text-stone-500">{user?.email}</span>
-            <span className="text-xs px-2 py-0.5 rounded-full bg-stone-200 text-stone-700">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+            <span className="hidden text-sm text-muted-foreground sm:inline">{user?.email}</span>
+            <Badge variant="secondary" className="font-normal">
               {user?.role}
-            </span>
-            <button
-              type="button"
-              onClick={logout}
-              className="text-sm text-stone-500 hover:text-stone-700"
-            >
+            </Badge>
+            <ModeToggle />
+            <Button variant="ghost" size="sm" onClick={logout} className="text-muted-foreground">
               Log out
-            </button>
+            </Button>
           </div>
         </div>
       </header>
 
-      <main className="max-w-4xl mx-auto px-4 py-8">
+      <main className="mx-auto max-w-4xl px-4 py-8">
         {error && (
-          <div className="mb-6 p-4 rounded-xl bg-red-50 text-red-700 text-sm">
-            {error}
-          </div>
+          <Alert variant="destructive" className="mb-6">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
         )}
 
         {isTeacher && (
-          <form
-            onSubmit={handleCreateClass}
-            className="mb-10 p-6 rounded-2xl bg-white border border-stone-100 shadow-sm"
-          >
-            <h2 className="text-lg font-semibold text-stone-800 mb-4">Create class</h2>
-            <div className="space-y-4">
-              <div className="flex flex-col sm:flex-row gap-4">
-                <input
-                  type="text"
-                  placeholder="Class name"
-                  value={createName}
-                  onChange={(e) => setCreateName(e.target.value)}
-                  className="flex-1 px-4 py-2.5 rounded-lg border border-stone-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none"
-                />
-                <input
-                  type="text"
-                  placeholder="Description (optional)"
-                  value={createDescription}
-                  onChange={(e) => setCreateDescription(e.target.value)}
-                  className="flex-1 px-4 py-2.5 rounded-lg border border-stone-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none"
-                />
-              </div>
-              <input
-                type="text"
-                placeholder="Redirect URL when meeting ends (optional, e.g. /dashboard or https://example.com/thanks)"
-                value={createRedirectUrl}
-                onChange={(e) => setCreateRedirectUrl(e.target.value)}
-                className="w-full px-4 py-2.5 rounded-lg border border-stone-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none text-sm"
-              />
-              <div className="rounded-xl border border-stone-100 bg-stone-50/90 p-4 space-y-3">
-                <div>
-                  <p className="text-sm font-medium text-stone-800">Student requirements</p>
-                  <p className="text-xs text-stone-500 mt-0.5">
-                    When enabled, invited students must keep camera or microphone on to use the meeting.
-                    You can change this later in class settings or during a live meeting.
-                  </p>
-                </div>
-                <label className="flex items-center gap-2.5 text-sm text-stone-700 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={createRequireCamera}
-                    onChange={(e) => setCreateRequireCamera(e.target.checked)}
-                    className="rounded border-stone-300 text-emerald-600 focus:ring-emerald-500"
-                  />
-                  Require camera for students
-                </label>
-                <label className="flex items-center gap-2.5 text-sm text-stone-700 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={createRequireMic}
-                    onChange={(e) => setCreateRequireMic(e.target.checked)}
-                    className="rounded border-stone-300 text-emerald-600 focus:ring-emerald-500"
-                  />
-                  Require microphone for students
-                </label>
-              </div>
-              <div className="rounded-xl border border-stone-100 bg-stone-50/90 p-4 space-y-3">
-                <div>
-                  <p className="text-sm font-medium text-stone-800">Attendance streak (optional)</p>
-                  <p className="text-xs text-stone-500 mt-0.5">
-                    When enabled, students see progress toward consecutive live class days with at least 10
-                    minutes credited (teacher present). Days without a session do not break the streak.
-                  </p>
-                </div>
-                <label className="flex items-center gap-2.5 text-sm text-stone-700 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={createStreakEnabled}
-                    onChange={(e) => setCreateStreakEnabled(e.target.checked)}
-                    className="rounded border-stone-300 text-emerald-600 focus:ring-emerald-500"
-                  />
-                  Enable streak for this class
-                </label>
-                {createStreakEnabled && (
-                  <label className="flex flex-col gap-1 max-w-[200px]">
-                    <span className="text-xs font-medium text-stone-600">Class days in a row</span>
-                    <input
-                      type="number"
-                      min={1}
-                      max={365}
-                      value={createStreakTargetDays}
-                      onChange={(e) =>
-                        setCreateStreakTargetDays(
-                          Math.min(365, Math.max(1, Number(e.target.value) || 21)),
-                        )
-                      }
-                      className="px-3 py-2 text-sm rounded-lg border border-stone-200 bg-white"
+          <Card className="mb-10 border-border/80 shadow-sm">
+            <CardHeader>
+              <CardTitle>Create class</CardTitle>
+              <CardDescription>Set up a new live session. You can invite students after it exists.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleCreateClass} className="space-y-4">
+                <div className="flex flex-col gap-4 sm:flex-row">
+                  <div className="flex-1 space-y-2">
+                    <Label htmlFor="create-name">Class name</Label>
+                    <Input
+                      id="create-name"
+                      placeholder="Morning meditation"
+                      value={createName}
+                      onChange={(e) => setCreateName(e.target.value)}
                     />
-                  </label>
-                )}
-              </div>
-              <button
-                type="submit"
-                disabled={creating || !createName.trim()}
-                className="px-6 py-2.5 rounded-lg bg-emerald-600 text-white font-medium hover:bg-emerald-700 disabled:opacity-50"
-              >
-                {creating ? "Creating..." : "Create"}
-              </button>
-            </div>
-          </form>
+                  </div>
+                  <div className="flex-1 space-y-2">
+                    <Label htmlFor="create-desc">Description (optional)</Label>
+                    <Input
+                      id="create-desc"
+                      placeholder="Short description"
+                      value={createDescription}
+                      onChange={(e) => setCreateDescription(e.target.value)}
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="create-redirect">Redirect when meeting ends (optional)</Label>
+                  <Input
+                    id="create-redirect"
+                    placeholder="/dashboard or https://example.com/thanks"
+                    value={createRedirectUrl}
+                    onChange={(e) => setCreateRedirectUrl(e.target.value)}
+                    className="text-sm"
+                  />
+                </div>
+                <div className="space-y-4 rounded-xl border bg-muted/30 p-4">
+                  <div>
+                    <p className="text-sm font-medium">Student requirements</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      When enabled, invited students must keep camera or microphone on to use the meeting.
+                      You can change this later in class settings or during a live meeting.
+                    </p>
+                  </div>
+                  <div className="flex items-center justify-between gap-4 rounded-lg border bg-background/80 px-3 py-2">
+                    <Label htmlFor="create-req-cam" className="cursor-pointer font-normal">
+                      Require camera for students
+                    </Label>
+                    <Switch
+                      id="create-req-cam"
+                      checked={createRequireCamera}
+                      onCheckedChange={setCreateRequireCamera}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between gap-4 rounded-lg border bg-background/80 px-3 py-2">
+                    <Label htmlFor="create-req-mic" className="cursor-pointer font-normal">
+                      Require microphone for students
+                    </Label>
+                    <Switch
+                      id="create-req-mic"
+                      checked={createRequireMic}
+                      onCheckedChange={setCreateRequireMic}
+                    />
+                  </div>
+                </div>
+                <div className="space-y-4 rounded-xl border bg-muted/30 p-4">
+                  <div>
+                    <p className="text-sm font-medium">Attendance streak (optional)</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      When enabled, students see progress toward consecutive live class days with at least 10
+                      minutes credited (teacher present). Days without a session do not break the streak.
+                    </p>
+                  </div>
+                  <div className="flex items-center justify-between gap-4 rounded-lg border bg-background/80 px-3 py-2">
+                    <Label htmlFor="create-streak" className="cursor-pointer font-normal">
+                      Enable streak for this class
+                    </Label>
+                    <Switch
+                      id="create-streak"
+                      checked={createStreakEnabled}
+                      onCheckedChange={setCreateStreakEnabled}
+                    />
+                  </div>
+                  {createStreakEnabled && (
+                    <div className="max-w-[200px] space-y-2">
+                      <Label htmlFor="create-streak-days">Class days in a row</Label>
+                      <Input
+                        id="create-streak-days"
+                        type="number"
+                        min={1}
+                        max={365}
+                        value={createStreakTargetDays}
+                        onChange={(e) =>
+                          setCreateStreakTargetDays(
+                            Math.min(365, Math.max(1, Number(e.target.value) || 21)),
+                          )
+                        }
+                      />
+                    </div>
+                  )}
+                </div>
+                <Button type="submit" disabled={creating || !createName.trim()}>
+                  {creating ? "Creating…" : "Create class"}
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
         )}
 
         <section>
-          <h2 className="text-lg font-semibold text-stone-800 mb-4">
+          <h2 className="mb-4 text-lg font-semibold tracking-tight text-foreground">
             {isTeacher ? "My classes" : "Classes"}
           </h2>
           {loading ? (
-            <p className="text-stone-500">Loading...</p>
+            <div className="space-y-3">
+              <Skeleton className="h-32 w-full rounded-xl" />
+              <Skeleton className="h-32 w-full rounded-xl" />
+            </div>
           ) : (
             <div className="space-y-4">
               {classes?.asTeacher?.map((c) => (
-                <div
+                <Card
                   key={c.id}
-                  className="p-5 rounded-2xl bg-white border border-stone-100 shadow-sm flex flex-wrap items-center justify-between gap-4"
+                  className="flex flex-wrap items-center justify-between gap-4 border-border/80 p-5 shadow-sm"
                 >
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-medium text-stone-800">{c.name}</h3>
+                  <div className="min-w-0 flex-1">
+                    <h3 className="font-medium text-foreground">{c.name}</h3>
                     {c.description && (
-                      <p className="text-sm text-stone-500 mt-0.5">{c.description}</p>
+                      <p className="mt-0.5 text-sm text-muted-foreground">{c.description}</p>
                     )}
-                    <p className="text-xs text-stone-400 mt-1">You are the teacher</p>
-                    <p className="text-xs text-stone-500 mt-1">
+                    <p className="mt-1 text-xs text-muted-foreground">You are the teacher</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
                       Redirect URL:{" "}
                       {c.redirectUrl ? (
-                        <span className="text-stone-700 break-all">{c.redirectUrl}</span>
+                        <span className="break-all text-foreground">{c.redirectUrl}</span>
                       ) : (
                         <span className="italic">not set</span>
                       )}
                       {editRedirectClassId !== c.id && (
-                        <button
+                        <Button
                           type="button"
+                          variant="link"
+                          className="ml-1 h-auto p-0 text-primary"
                           onClick={() => openClassSettings(c)}
-                          className="ml-2 text-emerald-600 hover:underline"
                         >
                           Edit settings
-                        </button>
+                        </Button>
                       )}
                     </p>
-                    <p className="text-xs text-stone-500 mt-1">
+                    <p className="mt-1 text-xs text-muted-foreground">
                       Students: camera{" "}
-                      <span className="text-stone-700 font-medium">
+                      <span className="font-medium text-foreground">
                         {c.requireCamera ? "required" : "optional"}
                       </span>
                       {" · "}
                       mic{" "}
-                      <span className="text-stone-700 font-medium">
+                      <span className="font-medium text-foreground">
                         {c.requireMic ? "required" : "optional"}
                       </span>
                     </p>
-                    <p className="text-xs text-stone-500 mt-1">
+                    <p className="mt-1 text-xs text-muted-foreground">
                       Streak:{" "}
                       {c.streakEnabled ? (
-                        <span className="text-stone-700 font-medium">
+                        <span className="font-medium text-foreground">
                           {c.streakTargetDays ?? 21}-class-day goal
                         </span>
                       ) : (
-                        <span className="italic text-stone-400">off</span>
+                        <span className="italic text-muted-foreground/80">off</span>
                       )}
                     </p>
                     {editRedirectClassId === c.id && (
-                      <div className="mt-3 rounded-xl border border-stone-200 bg-stone-50/80 p-4 space-y-3 w-full max-w-xl">
-                        <div>
-                          <label className="block text-xs font-medium text-stone-600 mb-1">
+                      <div className="mt-3 w-full max-w-xl space-y-3 rounded-xl border bg-muted/30 p-4">
+                        <div className="space-y-2">
+                          <Label htmlFor={`edit-redirect-${c.id}`} className="text-xs">
                             Redirect when meeting ends
-                          </label>
-                          <input
-                            type="text"
+                          </Label>
+                          <Input
+                            id={`edit-redirect-${c.id}`}
                             placeholder="e.g. /dashboard or https://example.com/thanks"
                             value={editRedirectUrl}
                             onChange={(e) => setEditRedirectUrl(e.target.value)}
-                            className="w-full px-3 py-2 text-sm rounded-lg border border-stone-200 bg-white"
+                            className="text-sm"
                           />
                         </div>
-                        <div>
-                          <p className="text-xs font-medium text-stone-600 mb-2">Student requirements</p>
-                          <label className="flex items-center gap-2.5 text-sm text-stone-700 cursor-pointer mb-2">
-                            <input
-                              type="checkbox"
+                        <div className="space-y-2">
+                          <p className="text-xs font-medium text-muted-foreground">Student requirements</p>
+                          <div className="flex items-center justify-between gap-4 rounded-lg border bg-background/80 px-3 py-2">
+                            <Label htmlFor={`edit-cam-${c.id}`} className="cursor-pointer font-normal">
+                              Require camera for students
+                            </Label>
+                            <Switch
+                              id={`edit-cam-${c.id}`}
                               checked={editRequireCamera}
-                              onChange={(e) => setEditRequireCamera(e.target.checked)}
-                              className="rounded border-stone-300 text-emerald-600 focus:ring-emerald-500"
+                              onCheckedChange={setEditRequireCamera}
                             />
-                            Require camera for students
-                          </label>
-                          <label className="flex items-center gap-2.5 text-sm text-stone-700 cursor-pointer">
-                            <input
-                              type="checkbox"
+                          </div>
+                          <div className="flex items-center justify-between gap-4 rounded-lg border bg-background/80 px-3 py-2">
+                            <Label htmlFor={`edit-mic-${c.id}`} className="cursor-pointer font-normal">
+                              Require microphone for students
+                            </Label>
+                            <Switch
+                              id={`edit-mic-${c.id}`}
                               checked={editRequireMic}
-                              onChange={(e) => setEditRequireMic(e.target.checked)}
-                              className="rounded border-stone-300 text-emerald-600 focus:ring-emerald-500"
+                              onCheckedChange={setEditRequireMic}
                             />
-                            Require microphone for students
-                          </label>
+                          </div>
                         </div>
-                        <div>
-                          <p className="text-xs font-medium text-stone-600 mb-2">Attendance streak</p>
-                          <label className="flex items-center gap-2.5 text-sm text-stone-700 cursor-pointer mb-2">
-                            <input
-                              type="checkbox"
+                        <div className="space-y-2">
+                          <p className="text-xs font-medium text-muted-foreground">Attendance streak</p>
+                          <div className="flex items-center justify-between gap-4 rounded-lg border bg-background/80 px-3 py-2">
+                            <Label htmlFor={`edit-streak-${c.id}`} className="cursor-pointer font-normal">
+                              Enable streak for this class
+                            </Label>
+                            <Switch
+                              id={`edit-streak-${c.id}`}
                               checked={editStreakEnabled}
-                              onChange={(e) => setEditStreakEnabled(e.target.checked)}
-                              className="rounded border-stone-300 text-emerald-600 focus:ring-emerald-500"
+                              onCheckedChange={setEditStreakEnabled}
                             />
-                            Enable streak for this class
-                          </label>
+                          </div>
                           {editStreakEnabled && (
-                            <label className="flex flex-col gap-1 max-w-[200px]">
-                              <span className="text-xs text-stone-600">Class days in a row</span>
-                              <input
+                            <div className="max-w-[200px] space-y-2">
+                              <Label htmlFor={`edit-streak-days-${c.id}`} className="text-xs">
+                                Class days in a row
+                              </Label>
+                              <Input
+                                id={`edit-streak-days-${c.id}`}
                                 type="number"
                                 min={1}
                                 max={365}
@@ -611,145 +636,136 @@ export default function Dashboard() {
                                     Math.min(365, Math.max(1, Number(e.target.value) || 21)),
                                   )
                                 }
-                                className="w-full px-3 py-2 text-sm rounded-lg border border-stone-200 bg-white"
+                                className="text-sm"
                               />
-                            </label>
+                            </div>
                           )}
                         </div>
                         <div className="flex flex-wrap gap-2">
-                          <button
+                          <Button
                             type="button"
                             onClick={() => saveClassSettings(c.id)}
                             disabled={savingRedirect}
-                            className="px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700 disabled:opacity-50"
+                            size="sm"
                           >
                             {savingRedirect ? "Saving…" : "Save settings"}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={closeClassSettings}
-                            className="px-4 py-2 text-sm text-stone-600 hover:text-stone-800"
-                          >
+                          </Button>
+                          <Button type="button" variant="ghost" size="sm" onClick={closeClassSettings}>
                             Cancel
-                          </button>
+                          </Button>
                         </div>
                       </div>
                     )}
                     {inviteClassId === c.id && (
                       <form
                         onSubmit={(e) => handleInvite(e, c.id)}
-                        className="mt-3 flex flex-wrap gap-2"
+                        className="mt-3 flex flex-wrap items-center gap-2"
                       >
-                        <input
+                        <Input
                           type="text"
                           placeholder="Emails (comma or space separated)"
                           value={inviteEmails}
                           onChange={(e) => setInviteEmails(e.target.value)}
-                          className="flex-1 min-w-[200px] px-3 py-1.5 text-sm rounded-lg border border-stone-200"
+                          className="min-w-[200px] flex-1 text-sm"
                         />
-                        <button
-                          type="submit"
-                          disabled={inviting}
-                          className="px-3 py-1.5 rounded-lg bg-stone-700 text-white text-sm hover:bg-stone-600 disabled:opacity-50"
-                        >
+                        <Button type="submit" disabled={inviting} size="sm" variant="secondary">
                           {inviting ? "Inviting…" : "Invite"}
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                           type="button"
-                          onClick={() => { setInviteClassId(null); setInviteEmails(""); }}
-                          className="px-3 py-1.5 text-sm text-stone-500 hover:text-stone-700"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setInviteClassId(null);
+                            setInviteEmails("");
+                          }}
                         >
                           Cancel
-                        </button>
+                        </Button>
                       </form>
                     )}
                   </div>
-                  <div className="flex flex-wrap gap-2 items-center">
-                    <button
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button
                       type="button"
+                      variant={liveOverviewClassId === c.id ? "secondary" : "outline"}
+                      size="sm"
                       onClick={() => toggleLiveOverview(c.id)}
-                      className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
-                        liveOverviewClassId === c.id
-                          ? "bg-amber-100 text-amber-800 border border-amber-300"
-                          : "border border-stone-200 text-stone-700 hover:bg-stone-50"
-                      }`}
+                      className={cn(
+                        liveOverviewClassId === c.id &&
+                          "border-amber-300/80 bg-amber-500/15 text-amber-950 hover:bg-amber-500/20 dark:text-amber-100",
+                      )}
                     >
                       {liveOverviewClassId === c.id ? "Hide live overview" : "Live overview"}
-                    </button>
+                    </Button>
                     {inviteClassId !== c.id && (
-                      <button
-                        type="button"
-                        onClick={() => setInviteClassId(c.id)}
-                        className="px-4 py-2 rounded-lg border border-stone-200 text-stone-700 text-sm font-medium hover:bg-stone-50"
-                      >
+                      <Button type="button" variant="outline" size="sm" onClick={() => setInviteClassId(c.id)}>
                         Invite
-                      </button>
+                      </Button>
                     )}
-                    <button
+                    <Button
                       type="button"
+                      variant={attendanceClassId === c.id ? "secondary" : "outline"}
+                      size="sm"
                       onClick={() => toggleAttendanceHistory(c.id)}
-                      className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
-                        attendanceClassId === c.id
-                          ? "bg-sky-100 text-sky-800 border border-sky-300"
-                          : "border border-stone-200 text-stone-700 hover:bg-stone-50"
-                      }`}
+                      className={cn(
+                        attendanceClassId === c.id &&
+                          "border-sky-300/80 bg-sky-500/15 text-sky-950 hover:bg-sky-500/20 dark:text-sky-100",
+                      )}
                     >
                       {attendanceClassId === c.id ? "Hide attendance" : "Attendance history"}
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       type="button"
+                      variant="outline"
+                      size="sm"
                       onClick={() => copyMeetingLink(c.id)}
                       title="Anyone with this link must sign in; only invited members can enter the room."
-                      className="px-4 py-2 rounded-lg border border-stone-200 text-stone-700 text-sm font-medium hover:bg-stone-50"
                     >
                       {copiedLinkClassId === c.id ? "Copied link" : "Copy invite link"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => goToMeeting(c.id)}
-                      className="px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700"
-                    >
+                    </Button>
+                    <Button type="button" size="sm" onClick={() => goToMeeting(c.id)}>
                       Start / Join meeting
-                    </button>
+                    </Button>
                   </div>
                   {attendanceClassId === c.id && (
-                    <div className="w-full mt-4 pt-4 border-t border-stone-100 space-y-6">
+                    <div className="mt-4 w-full space-y-6 border-t border-border pt-4">
                       <div>
-                        <h4 className="text-sm font-medium text-stone-800 mb-1">
+                        <h4 className="mb-1 text-sm font-medium text-foreground">
                           Attendance (host + student in meeting)
                         </h4>
-                        <p className="text-xs text-stone-500 mb-3">
+                        <p className="mb-3 text-xs text-muted-foreground">
                           Credited time is added in 30-second slices only when both you and the student are
                           connected to the LiveKit room. Days are UTC calendar dates.
                         </p>
                         {attendanceLoading ? (
-                          <p className="text-sm text-stone-500">Loading…</p>
+                          <p className="text-sm text-muted-foreground">Loading…</p>
                         ) : creditedTotals.length === 0 && creditedDaily.length === 0 ? (
-                          <p className="text-sm text-stone-500">No credited attendance yet.</p>
+                          <p className="text-sm text-muted-foreground">No credited attendance yet.</p>
                         ) : (
                           <>
                             {creditedTotals.length > 0 && (
                               <div className="mb-4">
-                                <h5 className="text-xs font-semibold text-stone-600 uppercase tracking-wide mb-2">
+                                <h5 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                                   Totals per student
                                 </h5>
-                                <div className="overflow-x-auto rounded-lg border border-stone-200">
-                                  <table className="w-full text-sm text-left">
-                                    <thead className="bg-stone-100 text-stone-600">
+                                <div className="overflow-x-auto rounded-lg border border-border">
+                                  <table className="w-full text-left text-sm">
+                                    <thead className="bg-muted/50 text-muted-foreground">
                                       <tr>
                                         <th className="px-3 py-2 font-medium">Student</th>
                                         <th className="px-3 py-2 font-medium">Total time</th>
                                         <th className="px-3 py-2 font-medium">Days</th>
                                       </tr>
                                     </thead>
-                                    <tbody className="divide-y divide-stone-100">
+                                    <tbody className="divide-y divide-border">
                                       {creditedTotals.map((r) => (
-                                        <tr key={r.email} className="bg-white">
-                                          <td className="px-3 py-2 text-stone-800">{r.email}</td>
-                                          <td className="px-3 py-2 text-stone-600">
+                                        <tr key={r.email} className="bg-card">
+                                          <td className="px-3 py-2 text-foreground">{r.email}</td>
+                                          <td className="px-3 py-2 text-muted-foreground">
                                             {formatCreditedSeconds(r.totalSeconds)}
                                           </td>
-                                          <td className="px-3 py-2 text-stone-600">{r.daysAttended}</td>
+                                          <td className="px-3 py-2 text-muted-foreground">{r.daysAttended}</td>
                                         </tr>
                                       ))}
                                     </tbody>
@@ -759,27 +775,27 @@ export default function Dashboard() {
                             )}
                             {creditedDaily.length > 0 && (
                               <div>
-                                <h5 className="text-xs font-semibold text-stone-600 uppercase tracking-wide mb-2">
+                                <h5 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                                   By day
                                 </h5>
-                                <div className="overflow-x-auto rounded-lg border border-stone-200">
-                                  <table className="w-full text-sm text-left">
-                                    <thead className="bg-stone-100 text-stone-600">
+                                <div className="overflow-x-auto rounded-lg border border-border">
+                                  <table className="w-full text-left text-sm">
+                                    <thead className="bg-muted/50 text-muted-foreground">
                                       <tr>
                                         <th className="px-3 py-2 font-medium">Student</th>
                                         <th className="px-3 py-2 font-medium">Date (UTC)</th>
                                         <th className="px-3 py-2 font-medium">Time that day</th>
                                       </tr>
                                     </thead>
-                                    <tbody className="divide-y divide-stone-100">
+                                    <tbody className="divide-y divide-border">
                                       {creditedDaily.map((r) => (
                                         <tr
                                           key={`${r.email}-${r.day}`}
-                                          className="bg-white"
+                                          className="bg-card"
                                         >
-                                          <td className="px-3 py-2 text-stone-800">{r.email}</td>
-                                          <td className="px-3 py-2 text-stone-600">{r.day}</td>
-                                          <td className="px-3 py-2 text-stone-600">
+                                          <td className="px-3 py-2 text-foreground">{r.email}</td>
+                                          <td className="px-3 py-2 text-muted-foreground">{r.day}</td>
+                                          <td className="px-3 py-2 text-muted-foreground">
                                             {formatCreditedSeconds(r.seconds)}
                                           </td>
                                         </tr>
@@ -794,18 +810,18 @@ export default function Dashboard() {
                       </div>
 
                       <div>
-                        <h4 className="text-sm font-medium text-stone-700 mb-2">
+                        <h4 className="mb-2 text-sm font-medium text-foreground">
                           Session log (join / leave)
                         </h4>
-                        <p className="text-xs text-stone-500 mb-2">
+                        <p className="mb-2 text-xs text-muted-foreground">
                           Raw connect/disconnect events; not gated on host presence.
                         </p>
                         {attendanceLoading ? null : attendance.length === 0 ? (
-                          <p className="text-sm text-stone-500">No session rows yet.</p>
+                          <p className="text-sm text-muted-foreground">No session rows yet.</p>
                         ) : (
-                          <div className="overflow-x-auto rounded-lg border border-stone-200">
-                            <table className="w-full text-sm text-left">
-                              <thead className="bg-stone-100 text-stone-600">
+                          <div className="overflow-x-auto rounded-lg border border-border">
+                            <table className="w-full text-left text-sm">
+                              <thead className="bg-muted/50 text-muted-foreground">
                                 <tr>
                                   <th className="px-3 py-2 font-medium">Email</th>
                                   <th className="px-3 py-2 font-medium">Joined</th>
@@ -813,17 +829,17 @@ export default function Dashboard() {
                                   <th className="px-3 py-2 font-medium">Duration</th>
                                 </tr>
                               </thead>
-                              <tbody className="divide-y divide-stone-100">
+                              <tbody className="divide-y divide-border">
                                 {attendance.map((r) => (
-                                  <tr key={r.id} className="bg-white">
-                                    <td className="px-3 py-2 text-stone-800">{r.email}</td>
-                                    <td className="px-3 py-2 text-stone-600">
+                                  <tr key={r.id} className="bg-card">
+                                    <td className="px-3 py-2 text-foreground">{r.email}</td>
+                                    <td className="px-3 py-2 text-muted-foreground">
                                       {formatTime(r.joinTime)}
                                     </td>
-                                    <td className="px-3 py-2 text-stone-600">
+                                    <td className="px-3 py-2 text-muted-foreground">
                                       {formatTime(r.leaveTime)}
                                     </td>
-                                    <td className="px-3 py-2 text-stone-600">
+                                    <td className="px-3 py-2 text-muted-foreground">
                                       {formatDuration(r.duration)}
                                     </td>
                                   </tr>
@@ -836,74 +852,74 @@ export default function Dashboard() {
                     </div>
                   )}
                   {liveOverviewClassId === c.id && (
-                    <div className="w-full mt-4 pt-4 border-t border-stone-100">
-                      <div className="flex items-center justify-between mb-2">
-                        <h4 className="text-sm font-medium text-stone-700">
-                          Currently in meeting
-                        </h4>
-                        <button
+                    <div className="mt-4 w-full border-t border-border pt-4">
+                      <div className="mb-2 flex items-center justify-between">
+                        <h4 className="text-sm font-medium text-foreground">Currently in meeting</h4>
+                        <Button
                           type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 text-xs"
                           onClick={() => fetchParticipants(c.id)}
                           disabled={participantsLoading}
-                          className="text-xs text-stone-500 hover:text-stone-700 disabled:opacity-50"
                         >
                           Refresh
-                        </button>
+                        </Button>
                       </div>
                       {participantsLoading ? (
-                        <p className="text-sm text-stone-500">Loading…</p>
+                        <p className="text-sm text-muted-foreground">Loading…</p>
                       ) : participants.length === 0 ? (
-                        <p className="text-sm text-stone-500">No participants</p>
+                        <p className="text-sm text-muted-foreground">No participants</p>
                       ) : (
                         <ul className="space-y-2">
                           {participants.map((p) => (
                             <li
                               key={p.identity}
-                              className="flex items-center justify-between gap-3 py-2 px-3 rounded-lg bg-stone-50"
+                              className="flex items-center justify-between gap-3 rounded-lg bg-muted/40 px-3 py-2"
                             >
-                              <span className="text-sm text-stone-800">
-                                {p.name || p.identity}
-                              </span>
-                              <button
+                              <span className="text-sm text-foreground">{p.name || p.identity}</span>
+                              <Button
                                 type="button"
+                                variant="destructive"
+                                size="sm"
+                                className="h-8 bg-destructive/15 text-destructive hover:bg-destructive/25"
                                 onClick={() => handleKick(c.id, p.identity)}
                                 disabled={kicking === p.identity}
-                                className="px-3 py-1 rounded text-sm font-medium bg-red-100 text-red-700 hover:bg-red-200 disabled:opacity-50"
                               >
                                 {kicking === p.identity ? "Kicking…" : "Kick"}
-                              </button>
+                              </Button>
                             </li>
                           ))}
                         </ul>
                       )}
-                      <h4 className="text-sm font-medium text-stone-700 mt-4 mb-2">
-                        Invited
-                      </h4>
+                      <h4 className="mb-2 mt-4 text-sm font-medium text-foreground">Invited</h4>
                       {invited.length === 0 ? (
-                        <p className="text-sm text-stone-500">No one invited yet</p>
+                        <p className="text-sm text-muted-foreground">No one invited yet</p>
                       ) : (
                         <ul className="space-y-1.5">
                           {invited.map((i) => (
                             <li
                               key={i.email}
-                              className="flex items-center justify-between gap-3 py-1.5 px-3 rounded-lg bg-stone-50 text-sm text-stone-700"
+                              className="flex items-center justify-between gap-3 rounded-lg bg-muted/40 px-3 py-1.5 text-sm text-foreground"
                             >
                               <span>{i.email}</span>
-                              <button
+                              <Button
                                 type="button"
+                                variant="secondary"
+                                size="sm"
+                                className="h-8 border border-amber-300/50 bg-amber-500/10 text-amber-950 hover:bg-amber-500/20 dark:text-amber-100"
                                 onClick={() => handleDisinvite(c.id, i.email)}
                                 disabled={disinviting === i.email}
-                                className="px-3 py-1 rounded text-sm font-medium bg-amber-100 text-amber-800 hover:bg-amber-200 disabled:opacity-50"
                               >
                                 {disinviting === i.email ? "Removing…" : "Disinvite"}
-                              </button>
+                              </Button>
                             </li>
                           ))}
                         </ul>
                       )}
                     </div>
                   )}
-                </div>
+                </Card>
               ))}
               {classes?.invited?.map((c) => {
                 const row = myAttendanceRowForClass(c.id);
@@ -914,94 +930,87 @@ export default function Dashboard() {
                       } with host`
                     : null;
                 return (
-                  <div
-                    key={c.id}
-                    className="rounded-2xl bg-white border border-stone-100 shadow-sm overflow-hidden"
-                  >
-                    <div className="p-5 flex flex-wrap items-center justify-between gap-4">
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-medium text-stone-800">{c.name}</h3>
+                  <Card key={c.id} className="overflow-hidden border-border/80 shadow-sm">
+                    <CardContent className="flex flex-wrap items-center justify-between gap-4 p-5">
+                      <div className="min-w-0 flex-1">
+                        <h3 className="font-medium text-foreground">{c.name}</h3>
                         {c.description && (
-                          <p className="text-sm text-stone-500 mt-0.5">{c.description}</p>
+                          <p className="mt-0.5 text-sm text-muted-foreground">{c.description}</p>
                         )}
-                        <p className="text-xs text-stone-400 mt-1">
-                          Teacher: {c.teacher?.email}
-                        </p>
+                        <p className="mt-1 text-xs text-muted-foreground">Teacher: {c.teacher?.email}</p>
                         {!isTeacher && summaryLine && studentAttendanceClassId !== c.id && (
-                          <p className="text-xs text-stone-500 mt-1.5">{summaryLine}</p>
+                          <p className="mt-1.5 text-xs text-muted-foreground">{summaryLine}</p>
                         )}
                       </div>
-                      <div className="flex flex-wrap gap-2 items-center">
+                      <div className="flex flex-wrap items-center gap-2">
                         {!isTeacher && (
-                          <button
+                          <Button
                             type="button"
+                            variant={studentAttendanceClassId === c.id ? "secondary" : "outline"}
+                            size="sm"
                             onClick={() => toggleStudentAttendance(c.id)}
-                            className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
-                              studentAttendanceClassId === c.id
-                                ? "bg-sky-100 text-sky-800 border border-sky-300"
-                                : "border border-stone-200 text-stone-700 hover:bg-stone-50"
-                            }`}
+                            className={cn(
+                              studentAttendanceClassId === c.id &&
+                                "border-sky-300/80 bg-sky-500/15 text-sky-950 hover:bg-sky-500/20 dark:text-sky-100",
+                            )}
                           >
                             {studentAttendanceClassId === c.id ? "Hide my attendance" : "My attendance"}
-                          </button>
+                          </Button>
                         )}
-                        <button
+                        <Button
                           type="button"
+                          variant="outline"
+                          size="sm"
                           onClick={() => copyMeetingLink(c.id)}
                           title="Sign in required. Only invited members can join."
-                          className="px-4 py-2 rounded-lg border border-stone-200 text-stone-700 text-sm font-medium hover:bg-stone-50"
                         >
                           {copiedLinkClassId === c.id ? "Copied link" : "Copy link"}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => goToMeeting(c.id)}
-                          className="px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700"
-                        >
+                        </Button>
+                        <Button type="button" size="sm" onClick={() => goToMeeting(c.id)}>
                           Join meeting
-                        </button>
+                        </Button>
                       </div>
-                    </div>
+                    </CardContent>
                     {!isTeacher && studentAttendanceClassId === c.id && (
-                      <div className="px-5 pb-5 pt-0 border-t border-stone-100">
-                        <p className="text-xs text-stone-500 mt-4 mb-3">
+                      <div className="border-t border-border px-5 pb-5 pt-0">
+                        <p className="mb-3 mt-4 text-xs text-muted-foreground">
                           Time counts only when you and the host are both in the live meeting (checked every
                           30 seconds). Days are UTC.
                         </p>
                         {myAttendanceLoading ? (
-                          <p className="text-sm text-stone-500">Loading…</p>
+                          <p className="text-sm text-muted-foreground">Loading…</p>
                         ) : !row ? (
-                          <p className="text-sm text-stone-500">
+                          <p className="text-sm text-muted-foreground">
                             No credited time yet for this class. Join while your teacher is in the meeting
                             to build your history.
                           </p>
                         ) : (
                           <>
-                            <div className="flex flex-wrap items-baseline justify-between gap-2 mb-3">
-                              <p className="text-sm text-stone-600">
-                                <span className="font-medium text-stone-800">
+                            <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
+                              <p className="text-sm text-muted-foreground">
+                                <span className="font-medium text-foreground">
                                   {formatCreditedSeconds(row.totalSeconds)}
                                 </span>
-                                <span className="text-stone-400"> · </span>
+                                <span className="text-muted-foreground/70"> · </span>
                                 {row.daysAttended} day{row.daysAttended === 1 ? "" : "s"} with host present
                               </p>
                             </div>
                             {row.daily.length === 0 ? (
-                              <p className="text-sm text-stone-500">No daily breakdown yet.</p>
+                              <p className="text-sm text-muted-foreground">No daily breakdown yet.</p>
                             ) : (
-                              <div className="overflow-x-auto rounded-lg border border-stone-200">
-                                <table className="w-full text-sm text-left">
-                                  <thead className="bg-stone-100 text-stone-600">
+                              <div className="overflow-x-auto rounded-lg border border-border">
+                                <table className="w-full text-left text-sm">
+                                  <thead className="bg-muted/50 text-muted-foreground">
                                     <tr>
                                       <th className="px-3 py-2 font-medium">Date (UTC)</th>
                                       <th className="px-3 py-2 font-medium">Time credited</th>
                                     </tr>
                                   </thead>
-                                  <tbody className="divide-y divide-stone-100">
+                                  <tbody className="divide-y divide-border">
                                     {row.daily.map((d) => (
-                                      <tr key={d.day} className="bg-white">
-                                        <td className="px-3 py-2 text-stone-800">{d.day}</td>
-                                        <td className="px-3 py-2 text-stone-600">
+                                      <tr key={d.day} className="bg-card">
+                                        <td className="px-3 py-2 text-foreground">{d.day}</td>
+                                        <td className="px-3 py-2 text-muted-foreground">
                                           {formatCreditedSeconds(d.seconds)}
                                         </td>
                                       </tr>
@@ -1014,11 +1023,11 @@ export default function Dashboard() {
                         )}
                       </div>
                     )}
-                  </div>
+                  </Card>
                 );
               })}
               {!classes?.asTeacher?.length && !classes?.invited?.length && (
-                <p className="text-stone-500 py-8">
+                <p className="py-8 text-center text-sm text-muted-foreground">
                   {isTeacher
                     ? "Create a class or wait for invites."
                     : "You have no classes yet. Ask a teacher to invite your email."}

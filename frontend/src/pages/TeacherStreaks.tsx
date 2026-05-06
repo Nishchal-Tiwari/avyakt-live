@@ -2,6 +2,19 @@ import { useEffect, useState, useCallback, useMemo } from "react";
 import { Link, Navigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { api } from "@/lib/api";
+import { ModeToggle } from "@/components/mode-toggle";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
 
 interface StreakBoardStudent {
   email: string;
@@ -79,64 +92,63 @@ export default function TeacherStreaks() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-stone-50 to-emerald-50/30">
-      <header className="border-b border-stone-200 bg-white/80 backdrop-blur">
-        <div className="max-w-5xl mx-auto px-4 py-4 flex flex-wrap items-center justify-between gap-3">
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/[0.06] dark:to-primary/10">
+      <header className="sticky top-0 z-20 border-b border-border/80 bg-background/80 backdrop-blur-md">
+        <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3 px-4 py-4">
           <div className="flex items-center gap-4">
-            <Link
-              to="/dashboard"
-              className="text-sm font-medium text-emerald-700 hover:text-emerald-900"
-            >
+            <Link to="/dashboard" className="text-sm font-medium text-primary hover:text-primary/80">
               ← Dashboard
             </Link>
-            <h1 className="text-xl font-semibold text-stone-800">Streak board</h1>
+            <h1 className="text-xl font-semibold tracking-tight text-foreground">Streak board</h1>
           </div>
-          <div className="flex items-center gap-4 text-sm">
-            <span className="text-stone-500">{user.email}</span>
-            <button
-              type="button"
-              onClick={logout}
-              className="text-stone-500 hover:text-stone-700"
-            >
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+            <span className="hidden text-sm text-muted-foreground sm:inline">{user.email}</span>
+            <ModeToggle />
+            <Button variant="ghost" size="sm" onClick={logout} className="text-muted-foreground">
               Log out
-            </button>
+            </Button>
           </div>
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto px-4 py-8 space-y-6">
-        <p className="text-sm text-stone-600">
-          Only classes with streaks enabled appear here. Progress uses host-present credited time: at
-          least 10 minutes per <strong className="font-medium text-stone-700">class day</strong> (UTC).
-          Calendar days without a live session are skipped and do not reset a student&apos;s streak.
-        </p>
+      <main className="mx-auto max-w-5xl space-y-6 px-4 py-8">
+        <Card className="border-border/80 bg-muted/20 shadow-none">
+          <CardContent className="p-4 text-sm text-muted-foreground">
+            Only classes with streaks enabled appear here. Progress uses host-present credited time: at
+            least 10 minutes per <strong className="font-medium text-foreground">class day</strong> (UTC).
+            Calendar days without a live session are skipped and do not reset a student&apos;s streak.
+          </CardContent>
+        </Card>
 
         {allBoardClasses.length > 1 && (
-          <label className="flex flex-col gap-1.5 max-w-md">
-            <span className="text-xs font-medium text-stone-600">Filter by class</span>
-            <select
-              value={classFilter}
-              onChange={(e) => setClassFilter(e.target.value)}
-              className="px-3 py-2.5 rounded-lg border border-stone-200 bg-white text-sm"
-            >
-              <option value="">All streak classes</option>
-              {allBoardClasses.map((c) => (
-                <option key={c.classId} value={c.classId}>
-                  {c.className}
-                </option>
-              ))}
-            </select>
-          </label>
+          <div className="flex max-w-md flex-col gap-2">
+            <Label className="text-xs text-muted-foreground">Filter by class</Label>
+            <Select value={classFilter || "all"} onValueChange={(v) => setClassFilter(v === "all" ? "" : v)}>
+              <SelectTrigger>
+                <SelectValue placeholder="All streak classes" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All streak classes</SelectItem>
+                {allBoardClasses.map((c) => (
+                  <SelectItem key={c.classId} value={c.classId}>
+                    {c.className}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         )}
 
         {error && (
-          <div className="p-4 rounded-xl bg-red-50 text-red-700 text-sm">{error}</div>
+          <Alert variant="destructive">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
         )}
 
-        {loading && <p className="text-stone-500 text-sm">Loading…</p>}
+        {loading && <p className="text-sm text-muted-foreground">Loading…</p>}
 
         {!loading && !error && allBoardClasses.length === 0 && (
-          <p className="text-stone-600 text-sm">
+          <p className="text-sm text-muted-foreground">
             No classes with streaks enabled. Turn on &quot;Attendance streak&quot; in class settings on
             the dashboard, then invite students.
           </p>
@@ -146,60 +158,63 @@ export default function TeacherStreaks() {
           classFilter &&
           boardClasses.length === 0 &&
           allBoardClasses.length > 0 && (
-            <p className="text-amber-800 text-sm">No matching class in this board.</p>
+            <Alert>
+              <AlertDescription>No matching class in this board.</AlertDescription>
+            </Alert>
           )}
 
         {!loading &&
           boardClasses.map((cls) => (
-            <section
-              key={cls.classId}
-              className="rounded-2xl bg-white border border-stone-100 shadow-sm overflow-hidden"
-            >
-              <div className="px-5 py-4 border-b border-stone-100 flex flex-wrap items-baseline justify-between gap-2">
-                <h2 className="font-semibold text-stone-800">{cls.className}</h2>
-                <p className="text-sm text-stone-500">
-                  Goal: <span className="font-medium text-stone-700">{cls.targetDays}</span> class days in
+            <Card key={cls.classId} className="overflow-hidden border-border/80 shadow-sm">
+              <CardHeader className="flex flex-row flex-wrap items-baseline justify-between gap-2 border-b border-border py-4">
+                <CardTitle className="text-base font-semibold">{cls.className}</CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  Goal: <span className="font-medium text-foreground">{cls.targetDays}</span> class days in
                   a row
                 </p>
-              </div>
-              {cls.students.length === 0 ? (
-                <p className="px-5 py-6 text-sm text-stone-500">No invited students yet.</p>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm text-left">
-                    <thead className="bg-stone-50 text-stone-600">
-                      <tr>
-                        <th className="px-4 py-3 font-medium">Student</th>
-                        <th className="px-4 py-3 font-medium">Streak built</th>
-                        <th className="px-4 py-3 font-medium">To goal</th>
-                        <th className="px-4 py-3 font-medium">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-stone-100">
-                      {cls.students.map((s) => (
-                        <tr key={s.email} className="bg-white">
-                          <td className="px-4 py-3 text-stone-800 break-all">{s.email}</td>
-                          <td className="px-4 py-3 text-stone-800 tabular-nums font-medium">
-                            {s.currentStreakClassDays} / {cls.targetDays}{" "}
-                            <span className="text-stone-500 font-normal">class days</span>
-                          </td>
-                          <td className="px-4 py-3 text-stone-600 tabular-nums">
-                            {s.goalMet ? "—" : `${s.daysRemaining} left`}
-                          </td>
-                          <td className="px-4 py-3 text-stone-600">
-                            {s.goalMet ? (
-                              <span className="text-emerald-700 font-medium">Goal met</span>
-                            ) : (
-                              s.headline
-                            )}
-                          </td>
+              </CardHeader>
+              <CardContent className="p-0">
+                {cls.students.length === 0 ? (
+                  <p className="px-5 py-6 text-sm text-muted-foreground">No invited students yet.</p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-sm">
+                      <thead className="bg-muted/50 text-muted-foreground">
+                        <tr>
+                          <th className="px-4 py-3 font-medium">Student</th>
+                          <th className="px-4 py-3 font-medium">Streak built</th>
+                          <th className="px-4 py-3 font-medium">To goal</th>
+                          <th className="px-4 py-3 font-medium">Status</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </section>
+                      </thead>
+                      <tbody className="divide-y divide-border">
+                        {cls.students.map((s) => (
+                          <tr key={s.email} className="bg-card">
+                            <td className="break-all px-4 py-3 text-foreground">{s.email}</td>
+                            <td className="px-4 py-3 font-medium tabular-nums text-foreground">
+                              {s.currentStreakClassDays} / {cls.targetDays}{" "}
+                              <span className="font-normal text-muted-foreground">class days</span>
+                            </td>
+                            <td className="px-4 py-3 tabular-nums text-muted-foreground">
+                              {s.goalMet ? "—" : `${s.daysRemaining} left`}
+                            </td>
+                            <td className="px-4 py-3 text-muted-foreground">
+                              {s.goalMet ? (
+                                <Badge variant="secondary" className="bg-primary/15 text-primary">
+                                  Goal met
+                                </Badge>
+                              ) : (
+                                s.headline
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           ))}
       </main>
     </div>

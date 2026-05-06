@@ -1,7 +1,7 @@
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { getSafeRedirectPath } from "@/lib/redirect";
-import { Skeleton } from "@/components/ui/skeleton";
+import { RouteLoadingScreen } from "@/components/looping-loader-video";
 import Login from "@/pages/Login";
 import Register from "@/pages/Register";
 import Dashboard from "@/pages/Dashboard";
@@ -14,12 +14,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   const location = useLocation();
   if (loading) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center gap-3 bg-background px-4">
-        <Skeleton className="h-10 w-48" />
-        <Skeleton className="h-4 w-32" />
-      </div>
-    );
+    return <RouteLoadingScreen />;
   }
   if (!user) {
     const from = `${location.pathname}${location.search}`;
@@ -31,12 +26,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 function StudentRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   if (loading) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center gap-3 bg-background px-4">
-        <Skeleton className="h-10 w-48" />
-        <Skeleton className="h-4 w-32" />
-      </div>
-    );
+    return <RouteLoadingScreen />;
   }
   if (!user) {
     return <Navigate to="/login" replace />;
@@ -50,12 +40,7 @@ function StudentRoute({ children }: { children: React.ReactNode }) {
 function TeacherRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   if (loading) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center gap-3 bg-background px-4">
-        <Skeleton className="h-10 w-48" />
-        <Skeleton className="h-4 w-32" />
-      </div>
-    );
+    return <RouteLoadingScreen />;
   }
   if (!user) {
     return <Navigate to="/login" replace />;
@@ -70,12 +55,7 @@ function GuestRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   const location = useLocation();
   if (loading) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center gap-3 bg-background px-4">
-        <Skeleton className="h-10 w-48" />
-        <Skeleton className="h-4 w-32" />
-      </div>
-    );
+    return <RouteLoadingScreen />;
   }
   if (user) {
     const params = new URLSearchParams(location.search);

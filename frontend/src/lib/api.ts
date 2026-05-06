@@ -43,16 +43,6 @@ async function handleResponse<T>(res: Response): Promise<T> {
 }
 
 export const api = {
-  /** GET /health on the backend (via /api/health when using the Vite proxy). */
-  async pingBackend(): Promise<boolean> {
-    try {
-      const res = await fetch(joinApiPath("/health"));
-      return res.ok;
-    } catch {
-      return false;
-    }
-  },
-
   async post<T>(path: string, body?: unknown, auth = true): Promise<T> {
     const headers = getHeaders(auth);
     const sentWithAuthHeader = auth && Boolean(getToken());

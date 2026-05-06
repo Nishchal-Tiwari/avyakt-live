@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { Sparkles } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { LoopingLoaderVideo } from "@/components/looping-loader-video";
 import { getSafeRedirectPath } from "@/lib/redirect";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -50,9 +50,7 @@ export default function Register() {
       <div className="relative flex min-h-screen items-center justify-center px-4 py-12">
         <div className="w-full max-w-md space-y-8">
           <div className="text-center">
-            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary shadow-sm ring-1 ring-primary/20">
-              <Sparkles className="h-7 w-7" aria-hidden />
-            </div>
+            <LoopingLoaderVideo variant="hero" />
             <h1 className="text-3xl font-bold tracking-tight text-foreground">Live Meditation</h1>
             <p className="mt-2 text-muted-foreground">Create your account</p>
           </div>

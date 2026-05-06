@@ -1,9 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { Sparkles } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { LoopingLoaderVideo } from "@/components/looping-loader-video";
+import { LOADER_SRC_MEDITATING_MONK } from "@/lib/loader-animations";
 import { getSafeRedirectPath } from "@/lib/redirect";
-import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -16,7 +16,6 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [backendOk, setBackendOk] = useState<boolean | null>(null);
   const { login } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -25,16 +24,6 @@ export default function Login() {
   const registerHref = redirectParam
     ? `/register?redirect=${encodeURIComponent(redirectParam)}`
     : "/register";
-
-  useEffect(() => {
-    let cancelled = false;
-    api.pingBackend().then((ok) => {
-      if (!cancelled) setBackendOk(ok);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -59,9 +48,7 @@ export default function Login() {
       <div className="relative flex min-h-screen items-center justify-center px-4 py-12">
         <div className="w-full max-w-md space-y-8">
           <div className="text-center">
-            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary shadow-sm ring-1 ring-primary/20">
-              <Sparkles className="h-7 w-7" aria-hidden />
-            </div>
+            <LoopingLoaderVideo variant="hero" src={LOADER_SRC_MEDITATING_MONK} />
             <h1 className="text-3xl font-bold tracking-tight text-foreground">Live Meditation</h1>
             <p className="mt-2 text-muted-foreground">Sign in to join live sessions</p>
           </div>
@@ -73,45 +60,10 @@ export default function Login() {
             </CardHeader>
             <form onSubmit={handleSubmit}>
               <CardContent className="space-y-4">
-                {backendOk === false && (
-                  <Alert variant="destructive">
-                    <AlertDescription>
-                      Cannot reach the server API. From the project root run{" "}
-                      <code className="rounded bg-muted px-1 py-0.5 text-xs">npm run dev</code> so the
-                      backend is listening on port 4000, or start it with{" "}
-                      <code className="rounded bg-muted px-1 py-0.5 text-xs">npm run dev --prefix backend</code>
-                      .
-                    </AlertDescription>
-                  </Alert>
-                )}
                 {error && (
                   <Alert variant="destructive">
-                    <AlertDescription>
-                      {error}
-                      {error.toLowerCase().includes("invalid") && (
-                        <span className="mt-2 block text-xs opacity-90">
-                          If you just set up the database, create demo users with{" "}
-                          <code className="rounded bg-background/80 px-1 py-0.5">
-                            {`cd backend && npx prisma db seed`}
-                          </code>{" "}
-                          then sign in as{" "}
-                          <strong className="font-medium">teacher@yoga.demo</strong> /{" "}
-                          <strong className="font-medium">demo123</strong>.
-                        </span>
-                      )}
-                    </AlertDescription>
+                    <AlertDescription>{error}</AlertDescription>
                   </Alert>
-                )}
-                {backendOk === true && !error && (
-                  <p className="rounded-lg border border-dashed border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
-                    After{" "}
-                    <code className="rounded bg-background px-1 py-0.5 text-[0.7rem]">
-                      npx prisma db seed
-                    </code>{" "}
-                    in <code className="rounded bg-background px-1 py-0.5 text-[0.7rem]">backend/</code>,
-                    use <strong className="text-foreground">teacher@yoga.demo</strong> /{" "}
-                    <strong className="text-foreground">demo123</strong>.
-                  </p>
                 )}
                 <div className="space-y-2">
                   <Label htmlFor="email">Email</Label>

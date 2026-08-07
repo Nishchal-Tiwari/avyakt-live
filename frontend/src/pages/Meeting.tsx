@@ -10,6 +10,7 @@ import {
   useTracks,
   VideoTrack,
   RoomAudioRenderer,
+  StartMediaButton,
   useIsSpeaking,
   isTrackReference,
   useChat,
@@ -874,6 +875,104 @@ function MediaConsentGate({
 }
 
 /* ═══════════════════════════════════════════════════════════
+   Screen share (with optional tab / system audio — LiveKit docs)
+   ═══════════════════════════════════════════════════════════ */
+
+/** Capture opts per https://docs.livekit.io/transport/media/screenshare/ */
+function getScreenShareCaptureOptions(withAudio: boolean): ScreenShareCaptureOptions {
+  if (!withAudio) {
+    return { audio: false, selfBrowserSurface: "include" };
+  }
+  return {
+    // Disable mic processing filters — they degrade shared tab/system audio.
+    audio: {
+      echoCancellation: false,
+      noiseSuppression: false,
+      autoGainControl: false,
+    },
+    // Chrome: offer system audio when sharing a window/screen (tabs use “Share tab audio”).
+    systemAudio: "include",
+    selfBrowserSurface: "include",
+    surfaceSwitching: "include",
+  };
+}
+
+function ScreenShareToggleButton({ withAudio }: { withAudio: boolean }) {
+  const { localParticipant, isScreenShareEnabled } = useLocalParticipant();
+  const [pending, setPending] = useState(false);
+
+  async function handleClick() {
+    if (!localParticipant || pending) return;
+    setPending(true);
+    try {
+      if (isScreenShareEnabled) {
+        await localParticipant.setScreenShareEnabled(false);
+        return;
+      }
+
+      await localParticipant.setScreenShareEnabled(true, getScreenShareCaptureOptions(withAudio));
+
+      if (withAudio) {
+        // Audio is only attached if the user picks a browser Tab (or system audio)
+        // and enables “Share tab audio” in the OS/browser picker.
+        const hasShareAudio = Boolean(
+          localParticipant.getTrackPublication(Track.Source.ScreenShareAudio)?.track,
+        );
+        if (!hasShareAudio) {
+          window.alert(
+            "Screen is sharing, but no shared audio was captured.\n\n" +
+              "In the browser picker:\n" +
+              "1. Choose a Chrome / Edge Tab (not Window)\n" +
+              "2. Enable “Share tab audio”\n" +
+              "3. Click Share again",
+          );
+        }
+      }
+    } catch (err) {
+      console.error("Screen share failed", err);
+      // Some browsers reject getDisplayMedia when audio is requested — retry video-only.
+      if (withAudio && !localParticipant.isScreenShareEnabled) {
+        try {
+          await localParticipant.setScreenShareEnabled(true, getScreenShareCaptureOptions(false));
+          window.alert(
+            "This browser could not capture share audio. Screen is shared without sound.",
+          );
+        } catch (retryErr) {
+          console.error("Screen share retry failed", retryErr);
+          window.alert(
+            retryErr instanceof Error ? retryErr.message : "Could not start screen share",
+          );
+        }
+      } else {
+        window.alert(err instanceof Error ? err.message : "Could not start screen share");
+      }
+    } finally {
+      setPending(false);
+    }
+  }
+
+  return (
+    <button
+      type="button"
+      className={`meet-ctrl-btn meet-ctrl-btn--toggle meet-ctrl-btn--share${
+        isScreenShareEnabled ? " meet-ctrl-btn--share-on" : ""
+      }`}
+      data-lk-enabled={isScreenShareEnabled ? "true" : "false"}
+      disabled={pending}
+      aria-pressed={isScreenShareEnabled}
+      title={
+        withAudio
+          ? "Share screen with audio (pick a browser tab and enable Share tab audio)"
+          : "Share screen"
+      }
+      onClick={() => void handleClick()}
+    >
+      {pending ? "…" : isScreenShareEnabled ? "Stop share" : "Share"}
+    </button>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════
    Bottom Control Bar (Google Meet style)
    ═══════════════════════════════════════════════════════════ */
 
@@ -908,23 +1007,14 @@ function BottomControlBar({
   const isMobile = useIsMobile();
   const timer = useMeetingTimer();
   const [ending, setEnding] = useState(false);
-  /** When true, the next screen-capture prompt asks for tab/system audio (browser-dependent). */
+  /** Next screen-share attempt requests tab/system audio when supported. */
   const [screenShareWithAudio, setScreenShareWithAudio] = useState(true);
-
-  const screenShareCaptureOptions = useMemo<ScreenShareCaptureOptions>(
-    () =>
-      screenShareWithAudio
-        ? { audio: true, systemAudio: "include" }
-        : { audio: false },
-    [screenShareWithAudio],
-  );
 
   async function handleEndMeeting() {
     setEnding(true);
     onRequestLeave();
     try {
       await api.post(`/classes/${classId}/end`, {});
-      // deleteRoom will disconnect peers; force local leave if room was never created.
       void room.disconnect();
     } catch (e) {
       console.error("End meeting failed", e);
@@ -941,7 +1031,6 @@ function BottomControlBar({
 
   return (
     <div className="meet-controls">
-      {/* Left: meeting info */}
       <div className="meet-controls__left">
         <div className="meet-controls__info">
           <ClockIcon />
@@ -949,7 +1038,6 @@ function BottomControlBar({
         </div>
       </div>
 
-      {/* Center: action buttons */}
       <div className="meet-controls__center">
         <div className="meet-controls__btn-group">
           <TrackToggle
@@ -969,20 +1057,18 @@ function BottomControlBar({
 
         {!isMobile && (
           <div className="meet-controls__btn-group meet-controls__btn-group--screenshare">
-            <label className="meet-screenshare-audio">
+            <label
+              className="meet-screenshare-audio"
+              title="Must be checked before sharing. In the browser picker choose a Tab and enable Share tab audio."
+            >
               <input
                 type="checkbox"
                 checked={screenShareWithAudio}
                 onChange={(e) => setScreenShareWithAudio(e.target.checked)}
-                title="Include audio from the shared tab or system when the browser supports it"
               />
-              <span>Share audio</span>
+              <span>Share sound</span>
             </label>
-            <TrackToggle
-              source={Track.Source.ScreenShare}
-              captureOptions={screenShareCaptureOptions}
-              className="meet-ctrl-btn meet-ctrl-btn--toggle meet-ctrl-btn--share"
-            />
+            <ScreenShareToggleButton withAudio={screenShareWithAudio} />
           </div>
         )}
 
@@ -1036,7 +1122,7 @@ function BottomControlBar({
           onClick={handleLeave}
           className="meet-ctrl-btn meet-ctrl-btn--leave"
         >
-          {isMobile ? "Leave" : "Leave"}
+          Leave
         </button>
 
         {isTeacher && (
@@ -1051,7 +1137,6 @@ function BottomControlBar({
         )}
       </div>
 
-      {/* Right: spacer for centering */}
       <div className="meet-controls__right" />
     </div>
   );
@@ -1167,7 +1252,9 @@ function MeetingInner({
         {!isTeacher && (
           <StudentStreakBanner classId={classId} streakEnabledForClass={streakEnabledForClass} />
         )}
-        {isTeacherPresent && <RoomAudioRenderer />}
+        {/* Always play remote mic + screen-share audio (not gated on host presence). */}
+        <RoomAudioRenderer />
+        <StartMediaButton label="Click to enable sound" className="meet-start-media" />
         <RoomChatBootstrap />
 
         <div className="meet-body">

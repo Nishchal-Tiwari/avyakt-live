@@ -1,18 +1,18 @@
 import { useEffect, useState, useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { ChevronDown, X } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { api, type ClassResponse } from "@/lib/api";
 import { ModeToggle } from "@/components/mode-toggle";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
-import { ChevronDown } from "lucide-react";
 
 interface Participant {
   identity: string;
@@ -254,6 +254,20 @@ export default function Dashboard() {
     setEditRedirectUrl("");
   }
 
+  useEffect(() => {
+    if (!editRedirectClassId) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !savingRedirect) closeClassSettings();
+    };
+    document.addEventListener("keydown", onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [editRedirectClassId, savingRedirect]);
+
   async function saveClassSettings(classId: string) {
     setSavingRedirect(true);
     setError("");
@@ -350,6 +364,7 @@ export default function Dashboard() {
   }
 
   const isTeacher = user?.role === "TEACHER";
+  const editingClass = classes?.asTeacher?.find((c) => c.id === editRedirectClassId);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/[0.06] dark:to-primary/10">
@@ -605,16 +620,14 @@ export default function Dashboard() {
                       ) : (
                         <span className="italic">not set</span>
                       )}
-                      {editRedirectClassId !== c.id && (
-                        <Button
-                          type="button"
-                          variant="link"
-                          className="ml-1 h-auto p-0 text-primary"
-                          onClick={() => openClassSettings(c)}
-                        >
-                          Edit settings
-                        </Button>
-                      )}
+                      <Button
+                        type="button"
+                        variant="link"
+                        className="ml-1 h-auto p-0 text-primary"
+                        onClick={() => openClassSettings(c)}
+                      >
+                        Edit settings
+                      </Button>
                     </p>
                     <p className="mt-1 text-xs text-muted-foreground">
                       Students: camera{" "}
@@ -637,91 +650,6 @@ export default function Dashboard() {
                         <span className="italic text-muted-foreground/80">off</span>
                       )}
                     </p>
-                    {editRedirectClassId === c.id && (
-                      <div className="mt-3 w-full max-w-xl space-y-3 rounded-xl border bg-muted/30 p-4">
-                        <div className="space-y-2">
-                          <Label htmlFor={`edit-redirect-${c.id}`} className="text-xs">
-                            Redirect when meeting ends
-                          </Label>
-                          <Input
-                            id={`edit-redirect-${c.id}`}
-                            placeholder="e.g. /dashboard or https://example.com/thanks"
-                            value={editRedirectUrl}
-                            onChange={(e) => setEditRedirectUrl(e.target.value)}
-                            className="text-sm"
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <p className="text-xs font-medium text-muted-foreground">Student requirements</p>
-                          <div className="flex items-center justify-between gap-4 rounded-lg border bg-background/80 px-3 py-2">
-                            <Label htmlFor={`edit-cam-${c.id}`} className="cursor-pointer font-normal">
-                              Require camera for students
-                            </Label>
-                            <Switch
-                              id={`edit-cam-${c.id}`}
-                              checked={editRequireCamera}
-                              onCheckedChange={setEditRequireCamera}
-                            />
-                          </div>
-                          <div className="flex items-center justify-between gap-4 rounded-lg border bg-background/80 px-3 py-2">
-                            <Label htmlFor={`edit-mic-${c.id}`} className="cursor-pointer font-normal">
-                              Require microphone for students
-                            </Label>
-                            <Switch
-                              id={`edit-mic-${c.id}`}
-                              checked={editRequireMic}
-                              onCheckedChange={setEditRequireMic}
-                            />
-                          </div>
-                        </div>
-                        <div className="space-y-2">
-                          <p className="text-xs font-medium text-muted-foreground">Attendance streak</p>
-                          <div className="flex items-center justify-between gap-4 rounded-lg border bg-background/80 px-3 py-2">
-                            <Label htmlFor={`edit-streak-${c.id}`} className="cursor-pointer font-normal">
-                              Enable streak for this class
-                            </Label>
-                            <Switch
-                              id={`edit-streak-${c.id}`}
-                              checked={editStreakEnabled}
-                              onCheckedChange={setEditStreakEnabled}
-                            />
-                          </div>
-                          {editStreakEnabled && (
-                            <div className="max-w-[200px] space-y-2">
-                              <Label htmlFor={`edit-streak-days-${c.id}`} className="text-xs">
-                                Class days in a row
-                              </Label>
-                              <Input
-                                id={`edit-streak-days-${c.id}`}
-                                type="number"
-                                min={1}
-                                max={365}
-                                value={editStreakTargetDays}
-                                onChange={(e) =>
-                                  setEditStreakTargetDays(
-                                    Math.min(365, Math.max(1, Number(e.target.value) || 21)),
-                                  )
-                                }
-                                className="text-sm"
-                              />
-                            </div>
-                          )}
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                          <Button
-                            type="button"
-                            onClick={() => saveClassSettings(c.id)}
-                            disabled={savingRedirect}
-                            size="sm"
-                          >
-                            {savingRedirect ? "Saving…" : "Save settings"}
-                          </Button>
-                          <Button type="button" variant="ghost" size="sm" onClick={closeClassSettings}>
-                            Cancel
-                          </Button>
-                        </div>
-                      </div>
-                    )}
                     {inviteClassId === c.id && (
                       <form
                         onSubmit={(e) => handleInvite(e, c.id)}
@@ -1103,6 +1031,141 @@ export default function Dashboard() {
           )}
         </section>
       </main>
+
+      {editRedirectClassId && editingClass && (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center p-4 sm:items-center"
+          role="presentation"
+        >
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/50 backdrop-blur-[2px]"
+            aria-label="Close settings"
+            disabled={savingRedirect}
+            onClick={closeClassSettings}
+          />
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="class-settings-title"
+            className="relative z-10 flex max-h-[min(90vh,640px)] w-full max-w-md flex-col overflow-hidden rounded-2xl border border-border/80 bg-card shadow-xl"
+          >
+            <div className="flex items-start justify-between gap-3 border-b border-border/70 px-5 py-4">
+              <div className="min-w-0">
+                <h2
+                  id="class-settings-title"
+                  className="truncate text-lg font-semibold tracking-tight text-foreground"
+                >
+                  Class settings
+                </h2>
+                <p className="mt-0.5 truncate text-sm text-muted-foreground">{editingClass.name}</p>
+              </div>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 shrink-0 rounded-full"
+                disabled={savingRedirect}
+                onClick={closeClassSettings}
+                aria-label="Close"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+
+            <div className="space-y-5 overflow-y-auto px-5 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-redirect" className="text-muted-foreground">
+                  Redirect when meeting ends{" "}
+                  <span className="font-normal opacity-70">(optional)</span>
+                </Label>
+                <Input
+                  id="edit-redirect"
+                  placeholder="/dashboard or https://…"
+                  value={editRedirectUrl}
+                  onChange={(e) => setEditRedirectUrl(e.target.value)}
+                  className="border-border/80 bg-background/60 shadow-none"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-foreground">During the meeting</p>
+                <div className="mt-2 divide-y divide-border/60 rounded-xl border border-border/60 bg-background/40">
+                  <div className="flex items-center justify-between gap-4 px-4 py-3">
+                    <Label htmlFor="edit-cam" className="cursor-pointer text-sm font-normal">
+                      Require student camera
+                    </Label>
+                    <Switch
+                      id="edit-cam"
+                      checked={editRequireCamera}
+                      onCheckedChange={setEditRequireCamera}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between gap-4 px-4 py-3">
+                    <Label htmlFor="edit-mic" className="cursor-pointer text-sm font-normal">
+                      Require student microphone
+                    </Label>
+                    <Switch
+                      id="edit-mic"
+                      checked={editRequireMic}
+                      onCheckedChange={setEditRequireMic}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between gap-4 px-4 py-3">
+                    <Label htmlFor="edit-streak" className="cursor-pointer text-sm font-normal">
+                      Track attendance streaks
+                    </Label>
+                    <Switch
+                      id="edit-streak"
+                      checked={editStreakEnabled}
+                      onCheckedChange={setEditStreakEnabled}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {editStreakEnabled && (
+                <div className="max-w-[12rem] space-y-2">
+                  <Label htmlFor="edit-streak-days" className="text-muted-foreground">
+                    Goal (days in a row)
+                  </Label>
+                  <Input
+                    id="edit-streak-days"
+                    type="number"
+                    min={1}
+                    max={365}
+                    value={editStreakTargetDays}
+                    onChange={(e) =>
+                      setEditStreakTargetDays(
+                        Math.min(365, Math.max(1, Number(e.target.value) || 21)),
+                      )
+                    }
+                    className="border-border/80 bg-background/60 shadow-none"
+                  />
+                </div>
+              )}
+            </div>
+
+            <div className="flex flex-wrap justify-end gap-2 border-t border-border/70 px-5 py-4">
+              <Button
+                type="button"
+                variant="ghost"
+                disabled={savingRedirect}
+                onClick={closeClassSettings}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                disabled={savingRedirect}
+                onClick={() => saveClassSettings(editRedirectClassId)}
+              >
+                {savingRedirect ? "Saving…" : "Save settings"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

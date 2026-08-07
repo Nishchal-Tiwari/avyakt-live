@@ -13,7 +13,6 @@ import {
   StartMediaButton,
   useIsSpeaking,
   isTrackReference,
-  useChat,
   useLayoutContext,
   usePinnedTracks,
   useConnectionState,
@@ -136,6 +135,50 @@ function ChevronRight() {
   );
 }
 
+function ScreenShareIcon({ className = "w-5 h-5" }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path
+        fill="currentColor"
+        fillRule="evenodd"
+        d="M2 5.75A2.75 2.75 0 0 1 4.75 3h14.5A2.75 2.75 0 0 1 22 5.75v10.5A2.75 2.75 0 0 1 19.25 19H4.75A2.75 2.75 0 0 1 2 16.25V5.75ZM4.75 4.5c-.69 0-1.25.56-1.25 1.25v10.5c0 .69.56 1.25 1.25 1.25h14.5c.69 0 1.25-.56 1.25-1.25V5.75c0-.69-.56-1.25-1.25-1.25H4.75Z"
+        clipRule="evenodd"
+      />
+      <path
+        fill="currentColor"
+        fillRule="evenodd"
+        d="M11.47 7.22a.75.75 0 0 1 1.06 0l2.25 2.25a.75.75 0 0 1-1.06 1.06l-.97-.97v4.69a.75.75 0 0 1-1.5 0V9.56l-.97.97a.75.75 0 1 1-1.06-1.06l2.25-2.25Z"
+        clipRule="evenodd"
+      />
+      <path
+        fill="currentColor"
+        d="M8 20.25a.75.75 0 0 1 .75-.75h6.5a.75.75 0 0 1 0 1.5h-6.5a.75.75 0 0 1-.75-.75Z"
+      />
+    </svg>
+  );
+}
+
+function ScreenShareStopIcon({ className = "w-5 h-5" }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path
+        fill="currentColor"
+        d="M9.28 7.22a.75.75 0 0 0-1.06 1.06L10.94 11l-2.72 2.72a.75.75 0 1 0 1.06 1.06L12 12.06l2.72 2.72a.75.75 0 1 0 1.06-1.06L13.06 11l2.72-2.72a.75.75 0 0 0-1.06-1.06L12 9.94 9.28 7.22Z"
+      />
+      <path
+        fill="currentColor"
+        fillRule="evenodd"
+        d="M4.75 3A2.75 2.75 0 0 0 2 5.75v10.5A2.75 2.75 0 0 0 4.75 19h14.5A2.75 2.75 0 0 0 22 16.25V5.75A2.75 2.75 0 0 0 19.25 3H4.75ZM3.5 5.75c0-.69.56-1.25 1.25-1.25h14.5c.69 0 1.25.56 1.25 1.25v10.5c0 .69-.56 1.25-1.25 1.25H4.75c-.69 0-1.25-.56-1.25-1.25V5.75Z"
+        clipRule="evenodd"
+      />
+      <path
+        fill="currentColor"
+        d="M8 20.25a.75.75 0 0 1 .75-.75h6.5a.75.75 0 0 1 0 1.5h-6.5a.75.75 0 0 1-.75-.75Z"
+      />
+    </svg>
+  );
+}
+
 function ChatIcon() {
   return (
     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -160,11 +203,8 @@ function ClockIcon() {
   );
 }
 
-/* Keeps LiveKit chat handlers registered so messages arrive even when the chat panel is closed. */
-function RoomChatBootstrap() {
-  useChat();
-  return null;
-}
+/* Chat is always mounted in MeetingInner (hidden when closed) — do not use a separate
+   useChat() bootstrap; two useChat scanners don't share message history. */
 
 /* ═══════════════════════════════════════════════════════════
    Device Picker (native <select> under icon — Meet-style caret)
@@ -827,13 +867,15 @@ function MediaConsentGate({
     void room.disconnect();
   }
 
-  if (isTeacher) {
-    return <>{children}</>;
-  }
-
+  // Always wrap in a flex shell so meet-root's column layout (video + controls) is preserved.
   return (
     <>
-      {!blocked && children}
+      <div
+        className={`meet-media-gate-shell${blocked ? " meet-media-gate-shell--inert" : ""}`}
+        aria-hidden={blocked || undefined}
+      >
+        {children}
+      </div>
       {blocked && (
         <div
           className="meet-media-gate"
@@ -960,6 +1002,7 @@ function ScreenShareToggleButton({ withAudio }: { withAudio: boolean }) {
       data-lk-enabled={isScreenShareEnabled ? "true" : "false"}
       disabled={pending}
       aria-pressed={isScreenShareEnabled}
+      aria-label={isScreenShareEnabled ? "Stop screen share" : "Share screen"}
       title={
         withAudio
           ? "Share screen with audio (pick a browser tab and enable Share tab audio)"
@@ -967,7 +1010,13 @@ function ScreenShareToggleButton({ withAudio }: { withAudio: boolean }) {
       }
       onClick={() => void handleClick()}
     >
-      {pending ? "…" : isScreenShareEnabled ? "Stop share" : "Share"}
+      {pending ? (
+        <span className="text-sm">…</span>
+      ) : isScreenShareEnabled ? (
+        <ScreenShareStopIcon />
+      ) : (
+        <ScreenShareIcon />
+      )}
     </button>
   );
 }
@@ -981,6 +1030,7 @@ function BottomControlBar({
   isTeacher,
   isChatOpen,
   isPeopleOpen,
+  chatUnread,
   onToggleChat,
   onTogglePeople,
   requireCameraPolicy,
@@ -993,6 +1043,7 @@ function BottomControlBar({
   isTeacher: boolean;
   isChatOpen: boolean;
   isPeopleOpen: boolean;
+  chatUnread: number;
   onToggleChat: () => void;
   onTogglePeople: () => void;
   requireCameraPolicy: boolean;
@@ -1075,10 +1126,16 @@ function BottomControlBar({
         <button
           type="button"
           onClick={onToggleChat}
-          className={`meet-ctrl-btn${isChatOpen ? " meet-ctrl-btn--active" : ""}`}
+          className={`meet-ctrl-btn meet-ctrl-btn--chat${isChatOpen ? " meet-ctrl-btn--active" : ""}`}
+          aria-label={chatUnread > 0 ? `Chat, ${chatUnread} unread` : "Chat"}
         >
           <ChatIcon />
           {!isMobile && <span>Chat</span>}
+          {chatUnread > 0 && (
+            <span className="meet-ctrl-btn__badge">
+              {chatUnread > 9 ? "9+" : chatUnread}
+            </span>
+          )}
         </button>
 
         <button
@@ -1173,6 +1230,11 @@ function MeetingInner({
   const [panel, setPanel] = useState<SidePanel>(null);
   const [requireCamera, setRequireCamera] = useState(initialRequireCamera);
   const [requireMic, setRequireMic] = useState(initialRequireMic);
+  const [chatUnread, setChatUnread] = useState(0);
+
+  const handleChatUnread = useCallback((count: number) => {
+    setChatUnread(count);
+  }, []);
 
   const applyRemotePolicy = useCallback((p: { requireCamera: boolean; requireMic: boolean }) => {
     setRequireCamera(p.requireCamera);
@@ -1252,13 +1314,17 @@ function MeetingInner({
         {!isTeacher && (
           <StudentStreakBanner classId={classId} streakEnabledForClass={streakEnabledForClass} />
         )}
-        {/* Always play remote mic + screen-share audio (not gated on host presence). */}
         <RoomAudioRenderer />
         <StartMediaButton label="Click to enable sound" className="meet-start-media" />
-        <RoomChatBootstrap />
 
         <div className="meet-body">
-          <div className={`meet-content${panel && !isMobile ? " meet-content--with-panel" : ""}`}>
+          <div
+            className={`meet-content${
+              (panel === "chat" || panel === "people") && !isMobile
+                ? " meet-content--with-panel"
+                : ""
+            }`}
+          >
             {!isTeacherPresent && (
               <div className="meet-waiting">
                 <div className="meet-waiting__card">
@@ -1279,16 +1345,26 @@ function MeetingInner({
             {(isTeacherPresent || isTeacher) && <VideoGrid />}
           </div>
 
-          {panel && (
+          {/* Keep chat mounted always so LiveKit delivers / retains messages while the panel is closed. */}
+          <div
+            className={`meet-side-panel${isMobile ? " meet-side-panel--mobile" : ""}${
+              panel === "chat" ? "" : " meet-side-panel--hidden"
+            }`}
+          >
+            <Chat
+              open={panel === "chat"}
+              onClose={() => setPanel(null)}
+              onUnreadChange={handleChatUnread}
+            />
+          </div>
+
+          {panel === "people" && (
             <div className={`meet-side-panel${isMobile ? " meet-side-panel--mobile" : ""}`}>
-              {panel === "chat" && <Chat onClose={() => setPanel(null)} />}
-              {panel === "people" && (
-                <ParticipantsPanel
-                  classId={classId}
-                  isTeacher={isTeacher}
-                  onClose={() => setPanel(null)}
-                />
-              )}
+              <ParticipantsPanel
+                classId={classId}
+                isTeacher={isTeacher}
+                onClose={() => setPanel(null)}
+              />
             </div>
           )}
         </div>
@@ -1298,6 +1374,7 @@ function MeetingInner({
           isTeacher={isTeacher}
           isChatOpen={panel === "chat"}
           isPeopleOpen={panel === "people"}
+          chatUnread={chatUnread}
           onToggleChat={() => togglePanel("chat")}
           onTogglePeople={() => togglePanel("people")}
           requireCameraPolicy={requireCamera}

@@ -2,19 +2,26 @@
 # Usage: docker compose up -d
 # App: http://localhost:80  (frontend + API at /api)
 # Set BACKEND_LIVEKIT_URL to the URL browsers use to reach LiveKit (e.g. ws://YOUR_SERVER_IP:7880).
+#
+# Local npm run dev (backend + Vite): only start infra, not the app containers:
+#   docker compose up -d postgres livekit
+# Then: npm run dev
+# Backend .env should use DATABASE_URL=...@localhost:5432/yoga_class...
 
 services:
   postgres:
     image: postgres:16-alpine
     restart: unless-stopped
+    ports:
+      - "5432:5432"
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: yoga
+      POSTGRES_DB: yoga_class
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d yoga_class"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -38,7 +45,7 @@ services:
     environment:
       NODE_ENV: production
       PORT: 4000
-      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/yoga?schema=public
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/yoga_class?schema=public
       JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
       JWT_EXPIRES_IN: 7d
       LIVEKIT_URL: ${BACKEND_LIVEKIT_URL:-ws://localhost:7880}

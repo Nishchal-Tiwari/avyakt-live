@@ -12,6 +12,7 @@ import { Switch } from "@/components/ui/switch";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { ChevronDown } from "lucide-react";
 
 interface Participant {
   identity: string;
@@ -71,6 +72,7 @@ export default function Dashboard() {
   const [createRequireMic, setCreateRequireMic] = useState(false);
   const [createStreakEnabled, setCreateStreakEnabled] = useState(false);
   const [createStreakTargetDays, setCreateStreakTargetDays] = useState(21);
+  const [createAdvancedOpen, setCreateAdvancedOpen] = useState(false);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState("");
   const [inviteClassId, setInviteClassId] = useState<string | null>(null);
@@ -295,6 +297,7 @@ export default function Dashboard() {
       setCreateRequireMic(false);
       setCreateStreakEnabled(false);
       setCreateStreakTargetDays(21);
+      setCreateAdvancedOpen(false);
       const data = await api.get<ClassesList>("/classes");
       setClasses(data);
     } catch (err) {
@@ -400,114 +403,177 @@ export default function Dashboard() {
         )}
 
         {isTeacher && (
-          <Card className="mb-10 border-border/80 shadow-sm">
-            <CardHeader>
-              <CardTitle>Create class</CardTitle>
-              <CardDescription>Set up a new live session. You can invite students after it exists.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleCreateClass} className="space-y-4">
-                <div className="flex flex-col gap-4 sm:flex-row">
-                  <div className="flex-1 space-y-2">
-                    <Label htmlFor="create-name">Class name</Label>
+          <section className="mb-12">
+            <form
+              onSubmit={handleCreateClass}
+              className="relative overflow-hidden rounded-2xl border border-border/70 bg-card/80 px-5 py-6 shadow-sm sm:px-7 sm:py-7"
+            >
+              <div
+                aria-hidden
+                className="pointer-events-none absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-primary/[0.07] to-transparent dark:from-primary/10"
+              />
+
+              <div className="relative space-y-5">
+                <div className="max-w-xl">
+                  <h2 className="text-2xl font-semibold tracking-tight text-foreground">
+                    New class
+                  </h2>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Name it, create it, invite students when you’re ready.
+                  </p>
+                </div>
+
+                <div className="space-y-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="create-name" className="text-muted-foreground">
+                      Class name
+                    </Label>
                     <Input
                       id="create-name"
-                      placeholder="Morning meditation"
+                      placeholder="e.g. Morning meditation"
                       value={createName}
                       onChange={(e) => setCreateName(e.target.value)}
+                      autoComplete="off"
+                      className="h-12 border-border/80 bg-background/80 text-base shadow-none focus-visible:ring-primary/40"
                     />
                   </div>
-                  <div className="flex-1 space-y-2">
-                    <Label htmlFor="create-desc">Description (optional)</Label>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="create-desc" className="text-muted-foreground">
+                      Description <span className="font-normal opacity-70">(optional)</span>
+                    </Label>
                     <Input
                       id="create-desc"
-                      placeholder="Short description"
+                      placeholder="A short note for your students"
                       value={createDescription}
                       onChange={(e) => setCreateDescription(e.target.value)}
+                      className="h-11 border-border/80 bg-background/60 shadow-none"
                     />
                   </div>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="create-redirect">Redirect when meeting ends (optional)</Label>
-                  <Input
-                    id="create-redirect"
-                    placeholder="/dashboard or https://example.com/thanks"
-                    value={createRedirectUrl}
-                    onChange={(e) => setCreateRedirectUrl(e.target.value)}
-                    className="text-sm"
-                  />
+
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <Button
+                    type="submit"
+                    size="lg"
+                    disabled={creating || !createName.trim()}
+                    className="h-11 min-w-[9.5rem] px-6"
+                  >
+                    {creating ? "Creating…" : "Create class"}
+                  </Button>
+
+                  <button
+                    type="button"
+                    onClick={() => setCreateAdvancedOpen((open) => !open)}
+                    className="inline-flex items-center gap-1.5 self-start text-sm text-muted-foreground transition-colors hover:text-foreground sm:self-auto"
+                    aria-expanded={createAdvancedOpen}
+                  >
+                    More options
+                    <ChevronDown
+                      className={cn(
+                        "h-4 w-4 transition-transform duration-200",
+                        createAdvancedOpen && "rotate-180",
+                      )}
+                    />
+                  </button>
                 </div>
-                <div className="space-y-4 rounded-xl border bg-muted/30 p-4">
-                  <div>
-                    <p className="text-sm font-medium">Student requirements</p>
-                    <p className="mt-0.5 text-xs text-muted-foreground">
-                      When enabled, invited students must keep camera or microphone on to use the meeting.
-                      You can change this later in class settings or during a live meeting.
-                    </p>
-                  </div>
-                  <div className="flex items-center justify-between gap-4 rounded-lg border bg-background/80 px-3 py-2">
-                    <Label htmlFor="create-req-cam" className="cursor-pointer font-normal">
-                      Require camera for students
-                    </Label>
-                    <Switch
-                      id="create-req-cam"
-                      checked={createRequireCamera}
-                      onCheckedChange={setCreateRequireCamera}
-                    />
-                  </div>
-                  <div className="flex items-center justify-between gap-4 rounded-lg border bg-background/80 px-3 py-2">
-                    <Label htmlFor="create-req-mic" className="cursor-pointer font-normal">
-                      Require microphone for students
-                    </Label>
-                    <Switch
-                      id="create-req-mic"
-                      checked={createRequireMic}
-                      onCheckedChange={setCreateRequireMic}
-                    />
-                  </div>
-                </div>
-                <div className="space-y-4 rounded-xl border bg-muted/30 p-4">
-                  <div>
-                    <p className="text-sm font-medium">Attendance streak (optional)</p>
-                    <p className="mt-0.5 text-xs text-muted-foreground">
-                      When enabled, students see progress toward consecutive live class days with at least 10
-                      minutes credited (teacher present). Days without a session do not break the streak.
-                    </p>
-                  </div>
-                  <div className="flex items-center justify-between gap-4 rounded-lg border bg-background/80 px-3 py-2">
-                    <Label htmlFor="create-streak" className="cursor-pointer font-normal">
-                      Enable streak for this class
-                    </Label>
-                    <Switch
-                      id="create-streak"
-                      checked={createStreakEnabled}
-                      onCheckedChange={setCreateStreakEnabled}
-                    />
-                  </div>
-                  {createStreakEnabled && (
-                    <div className="max-w-[200px] space-y-2">
-                      <Label htmlFor="create-streak-days">Class days in a row</Label>
+
+                {createAdvancedOpen && (
+                  <div className="space-y-5 border-t border-border/60 pt-5">
+                    <div className="space-y-2">
+                      <Label htmlFor="create-redirect" className="text-muted-foreground">
+                        End-of-meeting redirect{" "}
+                        <span className="font-normal opacity-70">(optional)</span>
+                      </Label>
                       <Input
-                        id="create-streak-days"
-                        type="number"
-                        min={1}
-                        max={365}
-                        value={createStreakTargetDays}
-                        onChange={(e) =>
-                          setCreateStreakTargetDays(
-                            Math.min(365, Math.max(1, Number(e.target.value) || 21)),
-                          )
-                        }
+                        id="create-redirect"
+                        placeholder="/dashboard or https://…"
+                        value={createRedirectUrl}
+                        onChange={(e) => setCreateRedirectUrl(e.target.value)}
+                        className="border-border/80 bg-background/60 shadow-none"
                       />
                     </div>
-                  )}
-                </div>
-                <Button type="submit" disabled={creating || !createName.trim()}>
-                  {creating ? "Creating…" : "Create class"}
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
+
+                    <div className="space-y-1">
+                      <p className="text-sm font-medium text-foreground">During the meeting</p>
+                      <p className="text-xs text-muted-foreground">
+                        Optional. You can change these anytime after creating.
+                      </p>
+                      <div className="mt-3 divide-y divide-border/60 rounded-xl border border-border/60 bg-background/40">
+                        <div className="flex items-center justify-between gap-4 px-4 py-3">
+                          <Label
+                            htmlFor="create-req-cam"
+                            className="cursor-pointer text-sm font-normal leading-snug"
+                          >
+                            Require student camera
+                          </Label>
+                          <Switch
+                            id="create-req-cam"
+                            checked={createRequireCamera}
+                            onCheckedChange={setCreateRequireCamera}
+                          />
+                        </div>
+                        <div className="flex items-center justify-between gap-4 px-4 py-3">
+                          <Label
+                            htmlFor="create-req-mic"
+                            className="cursor-pointer text-sm font-normal leading-snug"
+                          >
+                            Require student microphone
+                          </Label>
+                          <Switch
+                            id="create-req-mic"
+                            checked={createRequireMic}
+                            onCheckedChange={setCreateRequireMic}
+                          />
+                        </div>
+                        <div className="flex items-center justify-between gap-4 px-4 py-3">
+                          <div className="min-w-0">
+                            <Label
+                              htmlFor="create-streak"
+                              className="cursor-pointer text-sm font-normal leading-snug"
+                            >
+                              Track attendance streaks
+                            </Label>
+                            {createStreakEnabled && (
+                              <p className="mt-0.5 text-xs text-muted-foreground">
+                                Counts days with 10+ credited minutes.
+                              </p>
+                            )}
+                          </div>
+                          <Switch
+                            id="create-streak"
+                            checked={createStreakEnabled}
+                            onCheckedChange={setCreateStreakEnabled}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {createStreakEnabled && (
+                      <div className="max-w-[12rem] space-y-2">
+                        <Label htmlFor="create-streak-days" className="text-muted-foreground">
+                          Goal (days in a row)
+                        </Label>
+                        <Input
+                          id="create-streak-days"
+                          type="number"
+                          min={1}
+                          max={365}
+                          value={createStreakTargetDays}
+                          onChange={(e) =>
+                            setCreateStreakTargetDays(
+                              Math.min(365, Math.max(1, Number(e.target.value) || 21)),
+                            )
+                          }
+                          className="border-border/80 bg-background/60 shadow-none"
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </form>
+          </section>
         )}
 
         <section>

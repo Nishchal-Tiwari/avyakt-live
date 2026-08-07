@@ -109,6 +109,8 @@ export interface JoinMeetingResponse {
   url: string;
   roomName: string;
   redirectUrl?: string;
+  /** True when the caller owns the class (LiveKit roomAdmin). Not the same as role === TEACHER. */
+  isHost?: boolean;
   teacherName: string;
   teacherEmail: string;
   requireCamera?: boolean;

@@ -10,7 +10,8 @@ export async function createLiveKitToken(
   const at = new AccessToken(env.LIVEKIT_API_KEY, env.LIVEKIT_API_SECRET, {
     identity: participantIdentity,
     name: participantName,
-    ttl: "2h",
+    // Long enough for meditation sessions; client reconnects with a fresh token if needed.
+    ttl: "6h",
   });
 
   at.addGrant({
@@ -19,6 +20,7 @@ export async function createLiveKitToken(
     canPublish: true,
     canSubscribe: true,
     canPublishData: true,
+    // Host gets roomAdmin so server-side kick/end (via API key) is mirrored in participant grants.
     ...(isModerator && { roomAdmin: true }),
   });
 

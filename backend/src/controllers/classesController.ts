@@ -334,6 +334,13 @@ export async function disinviteFromClass(req: Request, res: Response): Promise<v
       where: { classId: id, email: normalizedEmail },
     });
 
+    // Drop them from the live room if present (invite alone does not eject).
+    try {
+      await roomService.removeParticipant(cls.roomName, normalizedEmail);
+    } catch {
+      /* room missing or participant already left */
+    }
+
     res.json({ success: true, message: "Participant disinvited" });
   } catch (err) {
     console.error("Disinvite error:", err);
@@ -385,6 +392,7 @@ export async function joinMeeting(req: Request, res: Response): Promise<void> {
       url: env.LIVEKIT_URL.trim(),
       roomName: cls.roomName,
       redirectUrl: cls.redirectUrl ?? undefined,
+      isHost: isTeacher,
       teacherName: cls.teacher.name || cls.teacher.email,
       teacherEmail: cls.teacher.email,
       requireCamera: cls.requireCamera,
@@ -416,7 +424,17 @@ export async function endMeeting(req: Request, res: Response): Promise<void> {
       return;
     }
 
-    await roomService.deleteRoom(cls.roomName);
+    try {
+      await roomService.deleteRoom(cls.roomName);
+    } catch (err) {
+      // Room may never have been created (no one connected yet) — treat as already ended.
+      const msg = err instanceof Error ? err.message : String(err);
+      if (!/not found|does not exist|404/i.test(msg)) {
+        console.error("End meeting error:", err);
+        res.status(500).json({ error: "Failed to end meeting" });
+        return;
+      }
+    }
 
     res.json({ success: true, message: "Meeting ended" });
   } catch (err) {
@@ -561,7 +579,16 @@ export async function kickParticipant(req: Request, res: Response): Promise<void
       return;
     }
 
-    await roomService.removeParticipant(cls.roomName, identity.trim());
+    try {
+      await roomService.removeParticipant(cls.roomName, identity.trim());
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (/not found|does not exist|404/i.test(msg)) {
+        res.json({ success: true, message: "Participant already left" });
+        return;
+      }
+      throw err;
+    }
 
     res.json({ success: true, message: "Participant removed" });
   } catch (err) {

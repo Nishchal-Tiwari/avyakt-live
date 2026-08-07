@@ -6,7 +6,6 @@ import {
   useParticipants,
   useLocalParticipant,
   TrackToggle,
-  DisconnectButton,
   useRoomContext,
   useTracks,
   VideoTrack,
@@ -24,6 +23,7 @@ import {
   Track,
   RoomEvent,
   ConnectionState,
+  DisconnectReason,
   type ScreenShareCaptureOptions,
   type Participant,
 } from "livekit-client";
@@ -166,8 +166,20 @@ function RoomChatBootstrap() {
 }
 
 /* ═══════════════════════════════════════════════════════════
-   Device Picker (native <select>)
+   Device Picker (native <select> under icon — Meet-style caret)
    ═══════════════════════════════════════════════════════════ */
+
+function DeviceSelectChevron() {
+  return (
+    <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden>
+      <path
+        fillRule="evenodd"
+        d="M14.77 12.79a.75.75 0 01-1.06-.02L10 8.83l-3.71 3.94a.75.75 0 11-1.08-1.04l4.25-4.5a.75.75 0 011.08 0l4.25 4.5a.75.75 0 01-.02 1.06z"
+        clipRule="evenodd"
+      />
+    </svg>
+  );
+}
 
 function NativeDeviceSelect({ kind }: { kind: MediaDeviceKind }) {
   const room = useRoomContext();
@@ -176,8 +188,12 @@ function NativeDeviceSelect({ kind }: { kind: MediaDeviceKind }) {
 
   useEffect(() => {
     async function load() {
-      const devs = await navigator.mediaDevices.enumerateDevices();
-      setDevices(devs.filter((d) => d.kind === kind));
+      const devs = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === kind);
+      setDevices(devs);
+      setActiveId((prev) => {
+        if (prev && devs.some((d) => d.deviceId === prev)) return prev;
+        return devs[0]?.deviceId ?? "";
+      });
     }
     load();
     navigator.mediaDevices.addEventListener("devicechange", load);
@@ -196,20 +212,26 @@ function NativeDeviceSelect({ kind }: { kind: MediaDeviceKind }) {
 
   if (devices.length <= 1) return null;
 
+  const label = kind === "audioinput" ? "Choose microphone" : "Choose camera";
+
   return (
-    <select
-      value={activeId}
-      onChange={handleChange}
-      className="meet-device-select"
-      title={kind === "audioinput" ? "Choose Microphone" : "Choose Camera"}
-    >
-      {!activeId && <option value="">Select…</option>}
-      {devices.map((d) => (
-        <option key={d.deviceId} value={d.deviceId}>
-          {d.label || `Device ${d.deviceId.slice(0, 8)}`}
-        </option>
-      ))}
-    </select>
+    <div className="meet-device-select-wrap" title={label}>
+      <span className="meet-device-select-icon" aria-hidden>
+        <DeviceSelectChevron />
+      </span>
+      <select
+        value={activeId}
+        onChange={handleChange}
+        className="meet-device-select"
+        aria-label={label}
+      >
+        {devices.map((d) => (
+          <option key={d.deviceId} value={d.deviceId}>
+            {d.label || `Device ${d.deviceId.slice(0, 8)}`}
+          </option>
+        ))}
+      </select>
+    </div>
   );
 }
 
@@ -494,6 +516,7 @@ function ParticipantsPanel({
       await api.post(`/classes/${classId}/kick`, { identity });
     } catch (e) {
       console.error("Kick failed", e);
+      window.alert(e instanceof Error ? e.message : "Failed to remove participant");
     } finally {
       setKicking(null);
     }
@@ -636,7 +659,7 @@ function StudentAttendanceTick({ classId, isTeacher }: { classId: string; isTeac
       api.post("/attendance/tick", { classId }).catch(() => {});
     }
 
-    const initial = window.setTimeout(tick, 4000);
+    const initial = window.setTimeout(tick, 30000);
     const interval = window.setInterval(tick, 30000);
     return () => {
       window.clearTimeout(initial);
@@ -722,12 +745,14 @@ function MediaConsentGate({
   requireCamera,
   requireMic,
   teacherName,
+  onRequestLeave,
   children,
 }: {
   isTeacher: boolean;
   requireCamera: boolean;
   requireMic: boolean;
   teacherName: string;
+  onRequestLeave: () => void;
   children: React.ReactNode;
 }) {
   const room = useRoomContext();
@@ -750,9 +775,19 @@ function MediaConsentGate({
     }
     if (strippedForPromptRef.current || consentBusy) return;
     strippedForPromptRef.current = true;
-    void localParticipant.setCameraEnabled(false);
-    void localParticipant.setMicrophoneEnabled(false);
-  }, [blocked, consentBusy, isTeacher, localParticipant]);
+    // Only shut off sources that currently violate policy (don't strip both if only one is required).
+    if (requireCamera && isCameraEnabled) void localParticipant.setCameraEnabled(false);
+    if (requireMic && isMicrophoneEnabled) void localParticipant.setMicrophoneEnabled(false);
+  }, [
+    blocked,
+    consentBusy,
+    isTeacher,
+    localParticipant,
+    requireCamera,
+    requireMic,
+    isCameraEnabled,
+    isMicrophoneEnabled,
+  ]);
 
   async function handleAccept() {
     if (!localParticipant || consentBusy) return;
@@ -761,19 +796,33 @@ function MediaConsentGate({
     try {
       if (requireCamera) await localParticipant.setCameraEnabled(true);
       if (requireMic) await localParticipant.setMicrophoneEnabled(true);
+      // Publication can lag behind the promise; poll briefly before failing.
+      const deadline = Date.now() + 2500;
+      while (Date.now() < deadline) {
+        const camOk = !requireCamera || localParticipant.isCameraEnabled;
+        const micOk = !requireMic || localParticipant.isMicrophoneEnabled;
+        if (camOk && micOk) return;
+        await new Promise((r) => setTimeout(r, 100));
+      }
       const camOk = !requireCamera || localParticipant.isCameraEnabled;
       const micOk = !requireMic || localParticipant.isMicrophoneEnabled;
       if (!camOk || !micOk) {
-        throw new Error("Camera or microphone could not be enabled");
+        throw new Error("Camera or microphone permission was denied or unavailable");
       }
-    } catch {
-      void room.disconnect();
+    } catch (e) {
+      console.error("Media consent failed", e);
+      window.alert(
+        e instanceof Error
+          ? e.message
+          : "Could not enable required devices. Check browser permissions.",
+      );
     } finally {
       setConsentBusy(false);
     }
   }
 
   function handleDecline() {
+    onRequestLeave();
     void room.disconnect();
   }
 
@@ -839,6 +888,7 @@ function BottomControlBar({
   requireMicPolicy,
   onToggleRequireCamera,
   onToggleRequireMic,
+  onRequestLeave,
 }: {
   classId: string;
   isTeacher: boolean;
@@ -850,7 +900,10 @@ function BottomControlBar({
   requireMicPolicy: boolean;
   onToggleRequireCamera: (next: boolean) => void;
   onToggleRequireMic: (next: boolean) => void;
+  /** Mark leave intentional so onDisconnected can navigate (avoids React StrictMode bounce). */
+  onRequestLeave: () => void;
 }) {
+  const room = useRoomContext();
   const participants = useParticipants();
   const isMobile = useIsMobile();
   const timer = useMeetingTimer();
@@ -868,13 +921,22 @@ function BottomControlBar({
 
   async function handleEndMeeting() {
     setEnding(true);
+    onRequestLeave();
     try {
       await api.post(`/classes/${classId}/end`, {});
+      // deleteRoom will disconnect peers; force local leave if room was never created.
+      void room.disconnect();
     } catch (e) {
       console.error("End meeting failed", e);
+      window.alert(e instanceof Error ? e.message : "Failed to end meeting");
     } finally {
       setEnding(false);
     }
+  }
+
+  function handleLeave() {
+    onRequestLeave();
+    void room.disconnect();
   }
 
   return (
@@ -969,19 +1031,23 @@ function BottomControlBar({
           </div>
         )}
 
-        {isTeacher ? (
+        <button
+          type="button"
+          onClick={handleLeave}
+          className="meet-ctrl-btn meet-ctrl-btn--leave"
+        >
+          {isMobile ? "Leave" : "Leave"}
+        </button>
+
+        {isTeacher && (
           <button
             type="button"
-            onClick={handleEndMeeting}
+            onClick={() => void handleEndMeeting()}
             disabled={ending}
             className="meet-ctrl-btn meet-ctrl-btn--leave"
           >
-            {ending ? "Ending…" : isMobile ? "End" : "End meeting"}
+            {ending ? "Ending…" : isMobile ? "End all" : "End for all"}
           </button>
-        ) : (
-          <DisconnectButton className="meet-ctrl-btn meet-ctrl-btn--leave">
-            Leave
-          </DisconnectButton>
         )}
       </div>
 
@@ -1005,6 +1071,7 @@ function MeetingInner({
   initialRequireCamera,
   initialRequireMic,
   streakEnabledForClass,
+  onRequestLeave,
 }: {
   classId: string;
   isTeacher: boolean;
@@ -1013,6 +1080,7 @@ function MeetingInner({
   initialRequireCamera: boolean;
   initialRequireMic: boolean;
   streakEnabledForClass: boolean;
+  onRequestLeave: () => void;
 }) {
   const room = useRoomContext();
   const participants = useParticipants();
@@ -1072,7 +1140,10 @@ function MeetingInner({
   );
 
   const isTeacherPresent =
-    isTeacher || participants.some((p) => p.identity === teacherEmail);
+    isTeacher ||
+    participants.some(
+      (p) => p.identity.trim().toLowerCase() === teacherEmail.trim().toLowerCase(),
+    );
 
   const togglePanel = (target: SidePanel) =>
     setPanel((prev) => (prev === target ? null : target));
@@ -1090,12 +1161,13 @@ function MeetingInner({
         requireCamera={requireCamera}
         requireMic={requireMic}
         teacherName={teacherName}
+        onRequestLeave={onRequestLeave}
       >
         <StudentAttendanceTick classId={classId} isTeacher={isTeacher} />
         {!isTeacher && (
           <StudentStreakBanner classId={classId} streakEnabledForClass={streakEnabledForClass} />
         )}
-        <RoomAudioRenderer />
+        {isTeacherPresent && <RoomAudioRenderer />}
         <RoomChatBootstrap />
 
         <div className="meet-body">
@@ -1149,6 +1221,7 @@ function MeetingInner({
           onToggleRequireMic={(next) => {
             void handleToggleRequireMic(next);
           }}
+          onRequestLeave={onRequestLeave}
         />
       </MediaConsentGate>
     </div>
@@ -1167,6 +1240,14 @@ export default function Meeting() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const leaveRecorded = useRef(false);
+  /** True after LiveKit reports Connected — attendance starts here, not on token fetch. */
+  const connectedOnceRef = useRef(false);
+  /**
+   * Set before intentional disconnect (Leave / End / Decline).
+   * Avoids bouncing to dashboard on React StrictMode remount CLIENT_INITIATED disconnects.
+   */
+  const userRequestedLeaveRef = useRef(false);
+  const redirectUrlRef = useRef<string | undefined>(undefined);
 
   useEffect(() => {
     if (!classId || !user) return;
@@ -1177,13 +1258,28 @@ export default function Meeting() {
       .finally(() => setLoading(false));
   }, [classId, user]);
 
-  const recordLeave = useCallback(() => {
-    if (leaveRecorded.current || !classId || !user?.email) return;
-    leaveRecorded.current = true;
-    api.post("/attendance/leave", { classId, email: user.email }).catch(() => {});
-  }, [classId, user?.email]);
+  const isHost = Boolean(tokenData?.isHost);
 
-  const redirectUrlRef = useRef<string | undefined>(undefined);
+  const recordLeave = useCallback(() => {
+    if (leaveRecorded.current || !classId || isHost) return;
+    leaveRecorded.current = true;
+    api.post("/attendance/leave", { classId }).catch(() => {});
+  }, [classId, isHost]);
+
+  const recordLeaveKeepalive = useCallback(() => {
+    if (leaveRecorded.current || !classId || isHost) return;
+    leaveRecorded.current = true;
+    const token = localStorage.getItem("token");
+    void fetch("/api/attendance/leave", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({ classId }),
+      keepalive: true,
+    }).catch(() => {});
+  }, [classId, isHost]);
 
   const redirectTo = useCallback(
     (fallback: string) => {
@@ -1202,14 +1298,54 @@ export default function Meeting() {
     [recordLeave, navigate],
   );
 
+  const markLeaveRequested = useCallback(() => {
+    userRequestedLeaveRef.current = true;
+  }, []);
+
   useEffect(() => {
     if (tokenData?.redirectUrl != null) redirectUrlRef.current = tokenData.redirectUrl;
   }, [tokenData?.redirectUrl]);
 
+  // Flush leave on tab close after a successful connect (keepalive survives navigation teardown).
   useEffect(() => {
-    if (!tokenData || !user?.email || !classId) return;
-    api.post("/attendance/join", { classId, email: user.email }).catch(() => {});
-  }, [tokenData, classId, user?.email]);
+    function onPageHide() {
+      if (connectedOnceRef.current) recordLeaveKeepalive();
+    }
+    window.addEventListener("pagehide", onPageHide);
+    return () => window.removeEventListener("pagehide", onPageHide);
+  }, [recordLeaveKeepalive]);
+
+  const handleConnected = useCallback(() => {
+    connectedOnceRef.current = true;
+    if (!classId || isHost) return;
+    api.post("/attendance/join", { classId }).catch(() => {});
+  }, [classId, isHost]);
+
+  const handleDisconnected = useCallback(
+    (reason?: DisconnectReason) => {
+      const code = reason as number | undefined;
+      const serverForced =
+        code === DisconnectReason.ROOM_DELETED ||
+        code === DisconnectReason.PARTICIPANT_REMOVED ||
+        code === DisconnectReason.SERVER_SHUTDOWN ||
+        code === DisconnectReason.JOIN_FAILURE ||
+        code === DisconnectReason.DUPLICATE_IDENTITY;
+
+      if (serverForced || userRequestedLeaveRef.current) {
+        redirectTo("/dashboard");
+        return;
+      }
+
+      // CLIENT_INITIATED without our flag = remount/cleanup (e.g. React StrictMode). Stay put.
+      if (code === DisconnectReason.CLIENT_INITIATED || !connectedOnceRef.current) {
+        return;
+      }
+
+      // Reconnect exhausted / unexpected drop after we were in the room.
+      redirectTo("/dashboard");
+    },
+    [redirectTo],
+  );
 
   if (loading) {
     return (
@@ -1223,9 +1359,8 @@ export default function Meeting() {
   }
 
   const hasValidUrl = (tokenData?.url?.trim() ?? "").length > 0;
-  const isTeacherUser = user?.role === "TEACHER";
   const studentNeedsMediaConsent =
-    !isTeacherUser &&
+    !isHost &&
     (Boolean(tokenData?.requireCamera) || Boolean(tokenData?.requireMic));
 
   if (error || !tokenData || !hasValidUrl) {
@@ -1262,22 +1397,30 @@ export default function Meeting() {
         connect={true}
         audio={!studentNeedsMediaConsent}
         video={!studentNeedsMediaConsent}
-        onDisconnected={() => redirectTo("/dashboard")}
+        onConnected={handleConnected}
+        onDisconnected={handleDisconnected}
         onError={(e) => {
+          // Media publish / getUserMedia failures must NOT eject from the room (LiveKit routes those here).
           console.error("LiveKit error", e);
-          redirectTo("/dashboard");
+          if (!connectedOnceRef.current) {
+            setError(e instanceof Error ? e.message : "Failed to connect to meeting");
+          }
+        }}
+        onMediaDeviceFailure={(failure) => {
+          console.warn("Media device failure", failure);
         }}
         style={{ height: "100%" }}
       >
         <LayoutContextProvider>
           <MeetingInner
             classId={classId!}
-            isTeacher={user!.role === "TEACHER"}
+            isTeacher={isHost}
             teacherName={tokenData.teacherName || "the Host"}
             teacherEmail={tokenData.teacherEmail || ""}
             initialRequireCamera={Boolean(tokenData.requireCamera)}
             initialRequireMic={Boolean(tokenData.requireMic)}
             streakEnabledForClass={Boolean(tokenData.streakEnabled)}
+            onRequestLeave={markLeaveRequested}
           />
         </LayoutContextProvider>
       </LiveKitRoom>

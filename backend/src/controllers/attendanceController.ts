@@ -23,23 +23,53 @@ function utcDayStart(d: Date): Date {
 
 export async function recordJoin(req: Request, res: Response): Promise<void> {
   try {
-    const { classId, email } = req.body as { classId?: string; email?: string };
+    const { classId } = req.body as { classId?: string };
 
-    if (!classId?.trim() || !email?.trim()) {
-      res.status(400).json({ error: "classId and email are required" });
+    if (!classId?.trim()) {
+      res.status(400).json({ error: "classId is required" });
       return;
     }
 
-    const cls = await prisma.class.findUnique({ where: { id: classId } });
+    const email = req.user!.email.trim().toLowerCase();
+    const cls = await prisma.class.findUnique({ where: { id: classId.trim() } });
     if (!cls) {
       res.status(404).json({ error: "Class not found" });
       return;
     }
 
+    // Host sessions are not attendance sessions.
+    if (cls.teacherId === req.user!.id) {
+      res.status(204).end();
+      return;
+    }
+
+    const invited = await prisma.classInvite.findFirst({
+      where: { classId: cls.id, email },
+    });
+    if (!invited) {
+      res.status(403).json({ error: "You are not invited to this class" });
+      return;
+    }
+
+    // Avoid duplicate open rows (reconnect / StrictMode remount).
+    const existing = await prisma.attendance.findFirst({
+      where: { classId: cls.id, email, leaveTime: null },
+      orderBy: { joinTime: "desc" },
+    });
+    if (existing) {
+      res.status(200).json({
+        id: existing.id,
+        classId: existing.classId,
+        email: existing.email,
+        joinTime: existing.joinTime,
+      });
+      return;
+    }
+
     const record = await prisma.attendance.create({
       data: {
-        classId: classId.trim(),
-        email: email.trim().toLowerCase(),
+        classId: cls.id,
+        email,
       },
     });
 
@@ -57,24 +87,36 @@ export async function recordJoin(req: Request, res: Response): Promise<void> {
 
 export async function recordLeave(req: Request, res: Response): Promise<void> {
   try {
-    const { classId, email } = req.body as { classId?: string; email?: string };
+    const { classId } = req.body as { classId?: string };
 
-    if (!classId?.trim() || !email?.trim()) {
-      res.status(400).json({ error: "classId and email are required" });
+    if (!classId?.trim()) {
+      res.status(400).json({ error: "classId is required" });
+      return;
+    }
+
+    const email = req.user!.email.trim().toLowerCase();
+    const cls = await prisma.class.findUnique({ where: { id: classId.trim() } });
+    if (!cls) {
+      res.status(404).json({ error: "Class not found" });
+      return;
+    }
+    if (cls.teacherId === req.user!.id) {
+      res.status(204).end();
       return;
     }
 
     const latest = await prisma.attendance.findFirst({
       where: {
-        classId: classId.trim(),
-        email: email.trim().toLowerCase(),
+        classId: cls.id,
+        email,
         leaveTime: null,
       },
       orderBy: { joinTime: "desc" },
     });
 
     if (!latest) {
-      res.status(404).json({ error: "No active attendance record found" });
+      // Idempotent: already left or never joined.
+      res.status(200).json({ success: true });
       return;
     }
 
